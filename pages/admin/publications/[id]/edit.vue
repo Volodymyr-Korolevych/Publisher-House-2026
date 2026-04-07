@@ -1,55 +1,56 @@
 <template>
-  <NuxtLayout name="admin">
-    <div v-if="initialValue" class="space-y-6">
-      <div>
-        <h1 class="text-3xl font-semibold">Редагування публікації</h1>
-        <p class="mt-2 text-slate-500">Базова форма оновлення запису.</p>
-      </div>
-
-      <div class="card p-6">
-        <PublicationForm :initial-value="initialValue" :categories="categories" submit-label="Оновити" @submit="handleSubmit" />
-      </div>
-
-      <p v-if="message" class="text-sm text-slate-500">{{ message }}</p>
+  <section>
+    <div class="mb-6">
+      <h1 class="page-title">Редагування публікації</h1>
+      <p class="page-subtitle">Оновлення даних електронної публікації.</p>
     </div>
 
-    <div v-else class="card p-10 text-center text-slate-500">
+    <div v-if="publication" class="card p-6">
+      <PublicationForm
+        :categories="categories"
+        :initial-data="publication"
+        submit-text="Зберегти зміни"
+        submit-loading-text="Збереження..."
+        @submit="handleUpdate"
+        @cancel="handleCancel"
+      />
+    </div>
+
+    <div v-else class="card p-8 text-center text-slate-500">
       Публікацію не знайдено.
     </div>
-  </NuxtLayout>
+  </section>
 </template>
 
 <script setup lang="ts">
-import type { Publication } from '~/types/models'
+import type { PublicationItem } from '~/composables/usePublications'
 
 definePageMeta({
-  middleware: ['admin']
+  layout: 'admin',
+  middleware: 'admin'
 })
 
 const route = useRoute()
-const { categories, fetchCategories } = useCategories()
-const { getPublicationById, updatePublication } = usePublications()
-const message = ref('')
+const { categories, loadCategories } = useCategories()
+const { currentPublication, loadPublications, loadPublicationById, updatePublication } = usePublications()
 
-await fetchCategories()
-const currentPublication = await getPublicationById(route.params.id as string)
+await loadCategories()
+await loadPublications()
+await loadPublicationById(String(route.params.id))
 
-const initialValue = computed(() => {
-  if (!currentPublication) {
-    return null
-  }
+const publication = computed(() => currentPublication.value)
 
-  const { id: _id, createdAt: _createdAt, ...rest } = currentPublication
-  return rest
-})
-
-const handleSubmit = async (value: Omit<Publication, 'id' | 'createdAt'>) => {
-  message.value = ''
+const handleUpdate = async (payload: Omit<PublicationItem, 'id'>) => {
   try {
-    await updatePublication(route.params.id as string, value)
+    await updatePublication(String(route.params.id), payload)
     await navigateTo('/admin/publications')
   } catch (error) {
-    message.value = error instanceof Error ? error.message : 'Не вдалося оновити публікацію.'
+    console.error(error)
+    alert('Не вдалося оновити публікацію.')
   }
+}
+
+const handleCancel = async () => {
+  await navigateTo('/admin/publications')
 }
 </script>

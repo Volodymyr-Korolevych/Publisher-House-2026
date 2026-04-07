@@ -1,40 +1,46 @@
 <template>
-  <NuxtLayout name="admin">
-    <div class="space-y-6">
-      <div>
-        <h1 class="text-3xl font-semibold">Додавання публікації</h1>
-        <p class="mt-2 text-slate-500">Стартова форма створення нового запису.</p>
-      </div>
-
-      <div class="card p-6">
-        <PublicationForm :categories="categories" @submit="handleSubmit" />
-      </div>
-
-      <p v-if="message" class="text-sm text-slate-500">{{ message }}</p>
+  <section>
+    <div class="mb-6">
+      <h1 class="page-title">Додавання публікації</h1>
+      <p class="page-subtitle">Створення нового запису в каталозі інтернет-видавництва.</p>
     </div>
-  </NuxtLayout>
+
+    <div class="card p-6">
+      <PublicationForm
+        :categories="categories"
+        submit-text="Створити публікацію"
+        submit-loading-text="Створення..."
+        @submit="handleCreate"
+        @cancel="handleCancel"
+      />
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import type { Publication } from '~/types/models'
+import type { PublicationItem } from '~/composables/usePublications'
 
 definePageMeta({
-  middleware: ['admin']
+  layout: 'admin',
+  middleware: 'admin'
 })
 
-const { categories, fetchCategories } = useCategories()
+const { categories, loadCategories } = useCategories()
 const { createPublication } = usePublications()
-const message = ref('')
 
-await fetchCategories()
+await loadCategories()
 
-const handleSubmit = async (value: Omit<Publication, 'id' | 'createdAt'>) => {
-  message.value = ''
+const handleCreate = async (payload: Omit<PublicationItem, 'id'>) => {
   try {
-    await createPublication(value)
+    await createPublication(payload)
     await navigateTo('/admin/publications')
   } catch (error) {
-    message.value = error instanceof Error ? error.message : 'Не вдалося створити публікацію.'
+    console.error(error)
+    alert('Не вдалося створити публікацію.')
   }
+}
+
+const handleCancel = async () => {
+  await navigateTo('/admin/publications')
 }
 </script>

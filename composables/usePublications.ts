@@ -101,14 +101,28 @@ export const usePublications = () => {
 
   const createPublication = async (payload: Omit<PublicationItem, 'id'>) => {
     await addDoc(collection($db, 'publications'), {
-      ...payload,
+      title: payload.title,
+      author: payload.author,
+      description: payload.description,
+      content: payload.content,
+      categoryId: payload.categoryId,
+      coverImage: payload.coverImage,
       createdAt: serverTimestamp()
     })
+
     await loadPublications()
   }
 
   const updatePublication = async (id: string, payload: Omit<PublicationItem, 'id'>) => {
-    await updateDoc(doc($db, 'publications', id), payload)
+    await updateDoc(doc($db, 'publications', id), {
+      title: payload.title,
+      author: payload.author,
+      description: payload.description,
+      content: payload.content,
+      categoryId: payload.categoryId,
+      coverImage: payload.coverImage
+    })
+
     await loadPublications()
   }
 
