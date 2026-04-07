@@ -1,0 +1,1137 @@
+name: TASK002 - Base app structure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  task002:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.5
+
+      - name: Write project files
+        shell: bash
+        run: |
+          mkdir -p components
+          mkdir -p layouts
+          mkdir -p pages/publications
+          mkdir -p pages/admin/publications
+          mkdir -p pages/admin/categories
+          mkdir -p pages/admin/users
+          mkdir -p composables
+          mkdir -p middleware
+          mkdir -p plugins
+
+          cat > nuxt.config.ts <<'EOF'
+          export default defineNuxtConfig({
+            compatibilityDate: '2024-10-14',
+            devtools: { enabled: true },
+            modules: ['@nuxtjs/tailwindcss'],
+            css: ['~/assets/css/main.css'],
+            runtimeConfig: {
+              public: {
+                firebaseApiKey: process.env.NUXT_PUBLIC_FIREBASE_API_KEY,
+                firebaseAuthDomain: process.env.NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+                firebaseProjectId: process.env.NUXT_PUBLIC_FIREBASE_PROJECT_ID,
+                firebaseStorageBucket: process.env.NUXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+                firebaseMessagingSenderId: process.env.NUXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+                firebaseAppId: process.env.NUXT_PUBLIC_FIREBASE_APP_ID
+              }
+            }
+          })
+          EOF
+
+          mkdir -p assets/css
+          cat > assets/css/main.css <<'EOF'
+          @tailwind base;
+          @tailwind components;
+          @tailwind utilities;
+
+          html, body, #__nuxt {
+            min-height: 100%;
+          }
+
+          body {
+            @apply bg-slate-50 text-slate-900;
+          }
+
+          .container-app {
+            @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+          }
+
+          .card {
+            @apply rounded-2xl bg-white shadow-sm ring-1 ring-slate-200;
+          }
+
+          .btn {
+            @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition;
+          }
+
+          .btn-primary {
+            @apply btn bg-slate-900 text-white hover:bg-slate-800;
+          }
+
+          .btn-secondary {
+            @apply btn bg-white text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100;
+          }
+
+          .input {
+            @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-2 outline-none transition focus:border-slate-500;
+          }
+
+          .label {
+            @apply mb-1 block text-sm font-medium text-slate-700;
+          }
+
+          .page-title {
+            @apply text-3xl font-bold tracking-tight text-slate-900;
+          }
+
+          .page-subtitle {
+            @apply mt-2 text-sm text-slate-600;
+          }
+          EOF
+
+          cat > plugins/firebase.client.ts <<'EOF'
+          import { initializeApp, getApps } from 'firebase/app'
+          import { getAuth } from 'firebase/auth'
+          import { getFirestore } from 'firebase/firestore'
+          import { getStorage } from 'firebase/storage'
+
+          export default defineNuxtPlugin(() => {
+            const config = useRuntimeConfig()
+
+            const firebaseConfig = {
+              apiKey: config.public.firebaseApiKey,
+              authDomain: config.public.firebaseAuthDomain,
+              projectId: config.public.firebaseProjectId,
+              storageBucket: config.public.firebaseStorageBucket,
+              messagingSenderId: config.public.firebaseMessagingSenderId,
+              appId: config.public.firebaseAppId
+            }
+
+            const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
+            const auth = getAuth(app)
+            const db = getFirestore(app)
+            const storage = getStorage(app)
+
+            return {
+              provide: {
+                firebaseApp: app,
+                auth,
+                db,
+                storage
+              }
+            }
+          })
+          EOF
+
+          cat > app.vue <<'EOF'
+          <template>
+            <NuxtLayout>
+              <NuxtPage />
+            </NuxtLayout>
+          </template>
+          EOF
+
+          cat > layouts/default.vue <<'EOF'
+          <template>
+            <div class="min-h-screen flex flex-col">
+              <AppHeader />
+              <main class="flex-1 py-8">
+                <div class="container-app">
+                  <slot />
+                </div>
+              </main>
+              <AppFooter />
+            </div>
+          </template>
+          EOF
+
+          cat > layouts/admin.vue <<'EOF'
+          <template>
+            <div class="min-h-screen bg-slate-100">
+              <AppHeader />
+              <div class="container-app py-8">
+                <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+                  <AdminSidebar />
+                  <div class="min-w-0">
+                    <slot />
+                  </div>
+                </div>
+              </div>
+              <AppFooter />
+            </div>
+          </template>
+          EOF
+
+          cat > components/AppHeader.vue <<'EOF'
+          <template>
+            <header class="border-b border-slate-200 bg-white/90 backdrop-blur">
+              <div class="container-app flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between">
+                <div class="flex items-center justify-between gap-4">
+                  <NuxtLink to="/" class="text-xl font-bold tracking-tight text-slate-900">
+                    Інтернет-видавництво
+                  </NuxtLink>
+
+                  <button
+                    class="rounded-xl border border-slate-300 px-3 py-2 text-sm md:hidden"
+                    @click="isOpen = !isOpen"
+                  >
+                    Меню
+                  </button>
+                </div>
+
+                <nav :class="['flex-col gap-3 md:flex md:flex-row md:items-center', isOpen ? 'flex' : 'hidden']">
+                  <NuxtLink to="/" class="text-sm text-slate-700 hover:text-slate-900">Головна</NuxtLink>
+                  <NuxtLink to="/publications" class="text-sm text-slate-700 hover:text-slate-900">Публікації</NuxtLink>
+
+                  <NuxtLink
+                    v-if="isLoggedIn"
+                    to="/profile"
+                    class="text-sm text-slate-700 hover:text-slate-900"
+                  >
+                    Профіль
+                  </NuxtLink>
+
+                  <NuxtLink
+                    v-if="isAdmin"
+                    to="/admin"
+                    class="text-sm text-slate-700 hover:text-slate-900"
+                  >
+                    Адмінка
+                  </NuxtLink>
+
+                  <NuxtLink
+                    v-if="!isLoggedIn"
+                    to="/login"
+                    class="btn-secondary"
+                  >
+                    Вхід
+                  </NuxtLink>
+
+                  <NuxtLink
+                    v-if="!isLoggedIn"
+                    to="/register"
+                    class="btn-primary"
+                  >
+                    Реєстрація
+                  </NuxtLink>
+
+                  <button
+                    v-if="isLoggedIn"
+                    class="btn-secondary"
+                    @click="handleLogout"
+                  >
+                    Вийти
+                  </button>
+                </nav>
+              </div>
+            </header>
+          </template>
+
+          <script setup lang="ts">
+          const isOpen = ref(false)
+          const { user, logout } = useAuth()
+
+          const isLoggedIn = computed(() => !!user.value)
+          const isAdmin = computed(() => user.value?.role === 'admin')
+
+          const handleLogout = async () => {
+            await logout()
+            await navigateTo('/')
+          }
+          </script>
+          EOF
+
+          cat > components/AppFooter.vue <<'EOF'
+          <template>
+            <footer class="border-t border-slate-200 bg-white">
+              <div class="container-app py-6 text-sm text-slate-500">
+                © {{ new Date().getFullYear() }} Інтернет-видавництво. Навчальний дипломний проєкт.
+              </div>
+            </footer>
+          </template>
+          EOF
+
+          cat > components/AdminSidebar.vue <<'EOF'
+          <template>
+            <aside class="card p-4">
+              <h2 class="mb-4 text-lg font-semibold text-slate-900">Адміністративна панель</h2>
+              <nav class="flex flex-col gap-2">
+                <NuxtLink to="/admin" class="rounded-xl px-3 py-2 text-sm hover:bg-slate-100">Огляд</NuxtLink>
+                <NuxtLink to="/admin/publications" class="rounded-xl px-3 py-2 text-sm hover:bg-slate-100">Публікації</NuxtLink>
+                <NuxtLink to="/admin/categories" class="rounded-xl px-3 py-2 text-sm hover:bg-slate-100">Категорії</NuxtLink>
+                <NuxtLink to="/admin/users" class="rounded-xl px-3 py-2 text-sm hover:bg-slate-100">Користувачі</NuxtLink>
+              </nav>
+            </aside>
+          </template>
+          EOF
+
+          cat > components/PublicationCard.vue <<'EOF'
+          <template>
+            <article class="card overflow-hidden">
+              <div class="aspect-[16/9] bg-slate-200">
+                <img
+                  v-if="publication.coverImage"
+                  :src="publication.coverImage"
+                  :alt="publication.title"
+                  class="h-full w-full object-cover"
+                >
+                <div v-else class="flex h-full items-center justify-center text-sm text-slate-500">
+                  Без обкладинки
+                </div>
+              </div>
+
+              <div class="p-5">
+                <p class="mb-2 text-xs uppercase tracking-wide text-slate-500">
+                  {{ publication.author || 'Невідомий автор' }}
+                </p>
+
+                <h3 class="mb-2 text-xl font-semibold text-slate-900">
+                  {{ publication.title }}
+                </h3>
+
+                <p class="mb-4 line-clamp-3 text-sm text-slate-600">
+                  {{ publication.description }}
+                </p>
+
+                <NuxtLink :to="`/publications/${publication.id}`" class="btn-primary">
+                  Читати
+                </NuxtLink>
+              </div>
+            </article>
+          </template>
+
+          <script setup lang="ts">
+          defineProps<{
+            publication: {
+              id: string
+              title: string
+              author?: string
+              description?: string
+              coverImage?: string
+            }
+          }>()
+          </script>
+          EOF
+
+          cat > composables/useAuth.ts <<'EOF'
+          import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth'
+          import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+
+          type UserRole = 'user' | 'admin'
+
+          interface AuthUser {
+            uid: string
+            name: string
+            email: string
+            role: UserRole
+          }
+
+          const authUserState = () => useState<AuthUser | null>('authUser', () => null)
+          const authReadyState = () => useState<boolean>('authReady', () => false)
+          const authInitState = () => useState<boolean>('authInitialized', () => false)
+
+          export const useAuth = () => {
+            const { $auth, $db } = useNuxtApp()
+            const user = authUserState()
+            const isReady = authReadyState()
+            const isInitialized = authInitState()
+
+            const initAuth = () => {
+              if (!process.client || isInitialized.value) return
+
+              isInitialized.value = true
+
+              onAuthStateChanged($auth, async (firebaseUser) => {
+                if (!firebaseUser) {
+                  user.value = null
+                  isReady.value = true
+                  return
+                }
+
+                const userRef = doc($db, 'users', firebaseUser.uid)
+                const userSnap = await getDoc(userRef)
+
+                if (userSnap.exists()) {
+                  const data = userSnap.data()
+                  user.value = {
+                    uid: firebaseUser.uid,
+                    name: String(data.name || ''),
+                    email: String(data.email || firebaseUser.email || ''),
+                    role: (data.role as UserRole) || 'user'
+                  }
+                } else {
+                  user.value = {
+                    uid: firebaseUser.uid,
+                    name: firebaseUser.displayName || '',
+                    email: firebaseUser.email || '',
+                    role: 'user'
+                  }
+                }
+
+                isReady.value = true
+              })
+            }
+
+            const register = async (payload: { name: string; email: string; password: string }) => {
+              const credentials = await createUserWithEmailAndPassword($auth, payload.email, payload.password)
+
+              await setDoc(doc($db, 'users', credentials.user.uid), {
+                name: payload.name,
+                email: payload.email,
+                role: 'user',
+                createdAt: serverTimestamp()
+              })
+
+              return credentials.user
+            }
+
+            const login = async (payload: { email: string; password: string }) => {
+              const credentials = await signInWithEmailAndPassword($auth, payload.email, payload.password)
+              return credentials.user
+            }
+
+            const logout = async () => {
+              await signOut($auth)
+              user.value = null
+            }
+
+            return {
+              user,
+              isReady,
+              initAuth,
+              register,
+              login,
+              logout
+            }
+          }
+          EOF
+
+          cat > composables/useCategories.ts <<'EOF'
+          import {
+            collection,
+            addDoc,
+            deleteDoc,
+            doc,
+            getDocs,
+            orderBy,
+            query,
+            updateDoc
+          } from 'firebase/firestore'
+
+          export interface CategoryItem {
+            id: string
+            name: string
+            description: string
+          }
+
+          const defaultCategories: CategoryItem[] = [
+            { id: '1', name: 'Програмування', description: 'Навчальні матеріали з програмування' },
+            { id: '2', name: 'Дизайн', description: 'Публікації з дизайну та графіки' },
+            { id: '3', name: 'Освіта', description: 'Матеріали для навчання та саморозвитку' }
+          ]
+
+          const categoriesState = () => useState<CategoryItem[]>('categories', () => [])
+
+          export const useCategories = () => {
+            const { $db } = useNuxtApp()
+            const categories = categoriesState()
+
+            const loadCategories = async () => {
+              try {
+                const q = query(collection($db, 'categories'), orderBy('name'))
+                const snapshot = await getDocs(q)
+
+                categories.value = snapshot.docs.map(docItem => ({
+                  id: docItem.id,
+                  name: String(docItem.data().name || ''),
+                  description: String(docItem.data().description || '')
+                }))
+
+                if (!categories.value.length) {
+                  categories.value = defaultCategories
+                }
+              } catch {
+                categories.value = defaultCategories
+              }
+            }
+
+            const createCategory = async (payload: { name: string; description: string }) => {
+              await addDoc(collection($db, 'categories'), payload)
+              await loadCategories()
+            }
+
+            const updateCategory = async (id: string, payload: { name: string; description: string }) => {
+              await updateDoc(doc($db, 'categories', id), payload)
+              await loadCategories()
+            }
+
+            const removeCategory = async (id: string) => {
+              await deleteDoc(doc($db, 'categories', id))
+              await loadCategories()
+            }
+
+            return {
+              categories,
+              loadCategories,
+              createCategory,
+              updateCategory,
+              removeCategory
+            }
+          }
+          EOF
+
+          cat > composables/usePublications.ts <<'EOF'
+          import {
+            addDoc,
+            collection,
+            deleteDoc,
+            doc,
+            getDoc,
+            getDocs,
+            orderBy,
+            query,
+            serverTimestamp,
+            updateDoc
+          } from 'firebase/firestore'
+
+          export interface PublicationItem {
+            id: string
+            title: string
+            author: string
+            description: string
+            content: string
+            categoryId: string
+            coverImage: string
+            createdAt?: unknown
+          }
+
+          const demoPublications: PublicationItem[] = [
+            {
+              id: 'demo-1',
+              title: 'Основи веб-розробки',
+              author: 'Олена Коваль',
+              description: 'Короткий вступ до сучасної веб-розробки та основ побудови інтерфейсів.',
+              content: 'Це демонстраційний текст публікації. Надалі тут буде повний вміст книги або статті.',
+              categoryId: '1',
+              coverImage: ''
+            },
+            {
+              id: 'demo-2',
+              title: 'Tailwind CSS для початківців',
+              author: 'Ірина Петренко',
+              description: 'Практичний матеріал для створення адаптивних інтерфейсів за допомогою utility-first підходу.',
+              content: 'Це демонстраційний текст другої публікації. Його можна буде замінити реальним контентом.',
+              categoryId: '2',
+              coverImage: ''
+            }
+          ]
+
+          const publicationsState = () => useState<PublicationItem[]>('publications', () => [])
+          const currentPublicationState = () => useState<PublicationItem | null>('currentPublication', () => null)
+
+          export const usePublications = () => {
+            const { $db } = useNuxtApp()
+            const publications = publicationsState()
+            const currentPublication = currentPublicationState()
+
+            const loadPublications = async () => {
+              try {
+                const q = query(collection($db, 'publications'), orderBy('title'))
+                const snapshot = await getDocs(q)
+
+                publications.value = snapshot.docs.map(docItem => ({
+                  id: docItem.id,
+                  title: String(docItem.data().title || ''),
+                  author: String(docItem.data().author || ''),
+                  description: String(docItem.data().description || ''),
+                  content: String(docItem.data().content || ''),
+                  categoryId: String(docItem.data().categoryId || ''),
+                  coverImage: String(docItem.data().coverImage || ''),
+                  createdAt: docItem.data().createdAt
+                }))
+
+                if (!publications.value.length) {
+                  publications.value = demoPublications
+                }
+              } catch {
+                publications.value = demoPublications
+              }
+            }
+
+            const loadPublicationById = async (id: string) => {
+              try {
+                const snapshot = await getDoc(doc($db, 'publications', id))
+
+                if (snapshot.exists()) {
+                  currentPublication.value = {
+                    id: snapshot.id,
+                    title: String(snapshot.data().title || ''),
+                    author: String(snapshot.data().author || ''),
+                    description: String(snapshot.data().description || ''),
+                    content: String(snapshot.data().content || ''),
+                    categoryId: String(snapshot.data().categoryId || ''),
+                    coverImage: String(snapshot.data().coverImage || ''),
+                    createdAt: snapshot.data().createdAt
+                  }
+                  return
+                }
+
+                currentPublication.value = publications.value.find(item => item.id === id) || null
+              } catch {
+                currentPublication.value = publications.value.find(item => item.id === id) || null
+              }
+            }
+
+            const createPublication = async (payload: Omit<PublicationItem, 'id'>) => {
+              await addDoc(collection($db, 'publications'), {
+                ...payload,
+                createdAt: serverTimestamp()
+              })
+              await loadPublications()
+            }
+
+            const updatePublication = async (id: string, payload: Omit<PublicationItem, 'id'>) => {
+              await updateDoc(doc($db, 'publications', id), payload)
+              await loadPublications()
+            }
+
+            const removePublication = async (id: string) => {
+              await deleteDoc(doc($db, 'publications', id))
+              await loadPublications()
+            }
+
+            return {
+              publications,
+              currentPublication,
+              loadPublications,
+              loadPublicationById,
+              createPublication,
+              updatePublication,
+              removePublication
+            }
+          }
+          EOF
+
+          cat > middleware/auth.ts <<'EOF'
+          export default defineNuxtRouteMiddleware(async () => {
+            const { user, isReady, initAuth } = useAuth()
+
+            if (process.client) {
+              initAuth()
+
+              if (!isReady.value) {
+                await new Promise<void>((resolve) => {
+                  const stop = watch(isReady, (value) => {
+                    if (value) {
+                      stop()
+                      resolve()
+                    }
+                  })
+                })
+              }
+            }
+
+            if (!user.value) {
+              return navigateTo('/login')
+            }
+          })
+          EOF
+
+          cat > middleware/admin.ts <<'EOF'
+          export default defineNuxtRouteMiddleware(async () => {
+            const { user, isReady, initAuth } = useAuth()
+
+            if (process.client) {
+              initAuth()
+
+              if (!isReady.value) {
+                await new Promise<void>((resolve) => {
+                  const stop = watch(isReady, (value) => {
+                    if (value) {
+                      stop()
+                      resolve()
+                    }
+                  })
+                })
+              }
+            }
+
+            if (!user.value) {
+              return navigateTo('/login')
+            }
+
+            if (user.value.role !== 'admin') {
+              return navigateTo('/')
+            }
+          })
+          EOF
+
+          cat > pages/index.vue <<'EOF'
+          <template>
+            <section class="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+              <div>
+                <p class="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Навчальний дипломний проєкт
+                </p>
+                <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+                  Web-сайт для інтернет-видавництва
+                </h1>
+                <p class="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
+                  Платформа для перегляду електронних публікацій, роботи з каталогом,
+                  авторизації користувачів та адміністрування контенту.
+                </p>
+                <div class="mt-6 flex flex-wrap gap-3">
+                  <NuxtLink to="/publications" class="btn-primary">Перейти до каталогу</NuxtLink>
+                  <NuxtLink to="/register" class="btn-secondary">Створити обліковий запис</NuxtLink>
+                </div>
+              </div>
+
+              <div class="card p-6">
+                <h2 class="mb-4 text-xl font-semibold text-slate-900">Основні можливості</h2>
+                <ul class="space-y-3 text-sm text-slate-600">
+                  <li>• каталог публікацій</li>
+                  <li>• пошук і перегляд матеріалів</li>
+                  <li>• реєстрація та авторизація</li>
+                  <li>• ролі користувачів</li>
+                  <li>• адміністративна частина</li>
+                  <li>• CRUD для публікацій і категорій</li>
+                </ul>
+              </div>
+            </section>
+          </template>
+          EOF
+
+          cat > pages/login.vue <<'EOF'
+          <template>
+            <section class="mx-auto max-w-md">
+              <div class="card p-6 sm:p-8">
+                <h1 class="page-title">Вхід</h1>
+                <p class="page-subtitle">Увійдіть до системи, використовуючи електронну пошту та пароль.</p>
+
+                <form class="mt-6 space-y-4" @submit.prevent="handleLogin">
+                  <div>
+                    <label class="label" for="email">Email</label>
+                    <input id="email" v-model="form.email" type="email" class="input" required>
+                  </div>
+
+                  <div>
+                    <label class="label" for="password">Пароль</label>
+                    <input id="password" v-model="form.password" type="password" class="input" required>
+                  </div>
+
+                  <p v-if="errorMessage" class="text-sm text-red-600">
+                    {{ errorMessage }}
+                  </p>
+
+                  <button type="submit" class="btn-primary w-full" :disabled="loading">
+                    {{ loading ? 'Виконується вхід...' : 'Увійти' }}
+                  </button>
+                </form>
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          const { login } = useAuth()
+
+          const form = reactive({
+            email: '',
+            password: ''
+          })
+
+          const loading = ref(false)
+          const errorMessage = ref('')
+
+          const handleLogin = async () => {
+            errorMessage.value = ''
+            loading.value = true
+
+            try {
+              await login({
+                email: form.email,
+                password: form.password
+              })
+
+              await navigateTo('/profile')
+            } catch (error: any) {
+              errorMessage.value = error?.message || 'Не вдалося виконати вхід.'
+            } finally {
+              loading.value = false
+            }
+          }
+          </script>
+          EOF
+
+          cat > pages/register.vue <<'EOF'
+          <template>
+            <section class="mx-auto max-w-md">
+              <div class="card p-6 sm:p-8">
+                <h1 class="page-title">Реєстрація</h1>
+                <p class="page-subtitle">Створіть обліковий запис користувача для роботи із сайтом.</p>
+
+                <form class="mt-6 space-y-4" @submit.prevent="handleRegister">
+                  <div>
+                    <label class="label" for="name">Ім’я</label>
+                    <input id="name" v-model="form.name" type="text" class="input" required>
+                  </div>
+
+                  <div>
+                    <label class="label" for="email">Email</label>
+                    <input id="email" v-model="form.email" type="email" class="input" required>
+                  </div>
+
+                  <div>
+                    <label class="label" for="password">Пароль</label>
+                    <input id="password" v-model="form.password" type="password" class="input" required minlength="6">
+                  </div>
+
+                  <p v-if="errorMessage" class="text-sm text-red-600">
+                    {{ errorMessage }}
+                  </p>
+
+                  <button type="submit" class="btn-primary w-full" :disabled="loading">
+                    {{ loading ? 'Створення облікового запису...' : 'Зареєструватися' }}
+                  </button>
+                </form>
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          const { register } = useAuth()
+
+          const form = reactive({
+            name: '',
+            email: '',
+            password: ''
+          })
+
+          const loading = ref(false)
+          const errorMessage = ref('')
+
+          const handleRegister = async () => {
+            errorMessage.value = ''
+            loading.value = true
+
+            try {
+              await register({
+                name: form.name,
+                email: form.email,
+                password: form.password
+              })
+
+              await navigateTo('/profile')
+            } catch (error: any) {
+              errorMessage.value = error?.message || 'Не вдалося створити обліковий запис.'
+            } finally {
+              loading.value = false
+            }
+          }
+          </script>
+          EOF
+
+          cat > pages/profile.vue <<'EOF'
+          <template>
+            <section>
+              <div class="card p-6">
+                <h1 class="page-title">Профіль користувача</h1>
+                <p class="page-subtitle">Персональні дані авторизованого користувача.</p>
+
+                <div v-if="user" class="mt-6 grid gap-4 sm:grid-cols-2">
+                  <div class="rounded-2xl bg-slate-50 p-4">
+                    <p class="text-sm text-slate-500">Ім’я</p>
+                    <p class="mt-1 font-medium text-slate-900">{{ user.name || 'Не вказано' }}</p>
+                  </div>
+
+                  <div class="rounded-2xl bg-slate-50 p-4">
+                    <p class="text-sm text-slate-500">Email</p>
+                    <p class="mt-1 font-medium text-slate-900">{{ user.email }}</p>
+                  </div>
+
+                  <div class="rounded-2xl bg-slate-50 p-4">
+                    <p class="text-sm text-slate-500">Роль</p>
+                    <p class="mt-1 font-medium uppercase text-slate-900">{{ user.role }}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          definePageMeta({
+            middleware: 'auth'
+          })
+
+          const { user, initAuth } = useAuth()
+
+          if (process.client) {
+            initAuth()
+          }
+          </script>
+          EOF
+
+          cat > pages/publications/index.vue <<'EOF'
+          <template>
+            <section>
+              <div class="mb-8">
+                <h1 class="page-title">Каталог публікацій</h1>
+                <p class="page-subtitle">
+                  Перегляд доступних книг, статей та електронних матеріалів.
+                </p>
+              </div>
+
+              <div class="card mb-6 p-4">
+                <label class="label" for="search">Пошук</label>
+                <input
+                  id="search"
+                  v-model="search"
+                  type="text"
+                  class="input"
+                  placeholder="Введіть назву або автора"
+                >
+              </div>
+
+              <div v-if="filteredPublications.length" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                <PublicationCard
+                  v-for="publication in filteredPublications"
+                  :key="publication.id"
+                  :publication="publication"
+                />
+              </div>
+
+              <div v-else class="card p-8 text-center text-slate-500">
+                Публікації не знайдено.
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          const { publications, loadPublications } = usePublications()
+          const search = ref('')
+
+          await loadPublications()
+
+          const filteredPublications = computed(() => {
+            const query = search.value.trim().toLowerCase()
+
+            if (!query) return publications.value
+
+            return publications.value.filter(item =>
+              item.title.toLowerCase().includes(query) ||
+              item.author.toLowerCase().includes(query)
+            )
+          })
+          </script>
+          EOF
+
+          cat > pages/publications/[id].vue <<'EOF'
+          <template>
+            <section v-if="publication" class="space-y-6">
+              <div class="card overflow-hidden">
+                <div class="aspect-[21/8] bg-slate-200">
+                  <img
+                    v-if="publication.coverImage"
+                    :src="publication.coverImage"
+                    :alt="publication.title"
+                    class="h-full w-full object-cover"
+                  >
+                  <div v-else class="flex h-full items-center justify-center text-sm text-slate-500">
+                    Без обкладинки
+                  </div>
+                </div>
+
+                <div class="p-6">
+                  <p class="mb-2 text-sm uppercase tracking-wide text-slate-500">
+                    {{ publication.author }}
+                  </p>
+                  <h1 class="page-title">{{ publication.title }}</h1>
+                  <p class="mt-3 text-base leading-7 text-slate-600">
+                    {{ publication.description }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="card p-6">
+                <h2 class="mb-4 text-xl font-semibold text-slate-900">Текст публікації</h2>
+                <div class="whitespace-pre-line leading-8 text-slate-700">
+                  {{ publication.content }}
+                </div>
+              </div>
+            </section>
+
+            <section v-else class="card p-8 text-center text-slate-500">
+              Публікацію не знайдено.
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          const route = useRoute()
+          const { currentPublication, loadPublicationById, loadPublications } = usePublications()
+
+          await loadPublications()
+          await loadPublicationById(String(route.params.id))
+
+          const publication = computed(() => currentPublication.value)
+          </script>
+          EOF
+
+          cat > pages/admin/index.vue <<'EOF'
+          <template>
+            <div>
+              <h1 class="page-title">Адміністративна панель</h1>
+              <p class="page-subtitle">Керування основними сутностями WEB-застосунку.</p>
+
+              <div class="mt-6 grid gap-6 md:grid-cols-3">
+                <div class="card p-5">
+                  <p class="text-sm text-slate-500">Публікації</p>
+                  <p class="mt-2 text-3xl font-bold text-slate-900">{{ publications.length }}</p>
+                </div>
+
+                <div class="card p-5">
+                  <p class="text-sm text-slate-500">Категорії</p>
+                  <p class="mt-2 text-3xl font-bold text-slate-900">{{ categories.length }}</p>
+                </div>
+
+                <div class="card p-5">
+                  <p class="text-sm text-slate-500">Роль</p>
+                  <p class="mt-2 text-3xl font-bold uppercase text-slate-900">{{ user?.role || '-' }}</p>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <script setup lang="ts">
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+
+          const { user, initAuth } = useAuth()
+          const { publications, loadPublications } = usePublications()
+          const { categories, loadCategories } = useCategories()
+
+          if (process.client) {
+            initAuth()
+          }
+
+          await loadPublications()
+          await loadCategories()
+          </script>
+          EOF
+
+          cat > pages/admin/publications/index.vue <<'EOF'
+          <template>
+            <section>
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h1 class="page-title">Керування публікаціями</h1>
+                  <p class="page-subtitle">Список матеріалів, доступних для редагування.</p>
+                </div>
+              </div>
+
+              <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-50">
+                    <tr>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Назва</th>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Автор</th>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Категорія</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="item in publications" :key="item.id" class="border-t border-slate-200">
+                      <td class="px-4 py-3 text-slate-900">{{ item.title }}</td>
+                      <td class="px-4 py-3 text-slate-600">{{ item.author }}</td>
+                      <td class="px-4 py-3 text-slate-600">{{ item.categoryId || '—' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+
+          const { loadPublications, publications } = usePublications()
+          await loadPublications()
+          </script>
+          EOF
+
+          cat > pages/admin/categories/index.vue <<'EOF'
+          <template>
+            <section>
+              <h1 class="page-title">Керування категоріями</h1>
+              <p class="page-subtitle">Перегляд наявних тематичних категорій.</p>
+
+              <div class="mt-6 grid gap-4">
+                <div v-for="item in categories" :key="item.id" class="card p-5">
+                  <h2 class="text-lg font-semibold text-slate-900">{{ item.name }}</h2>
+                  <p class="mt-2 text-sm text-slate-600">{{ item.description }}</p>
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+
+          const { categories, loadCategories } = useCategories()
+          await loadCategories()
+          </script>
+          EOF
+
+          cat > pages/admin/users/index.vue <<'EOF'
+          <template>
+            <section>
+              <h1 class="page-title">Користувачі</h1>
+              <p class="page-subtitle">На цьому етапі підготуємо сторінку для подальшого розвитку функціоналу.</p>
+
+              <div class="mt-6 card p-6 text-slate-600">
+                Тут буде реалізовано перегляд списку користувачів системи.
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+          </script>
+          EOF
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
+
+      - name: Commit and push changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .
+          git diff --cached --quiet || git commit -m "TASK002: add base app structure, layouts, pages, middleware and composables"
+          git push
