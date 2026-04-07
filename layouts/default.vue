@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="min-h-screen flex flex-col">
     <AppHeader />
-    <main class="py-8">
-      <div class="container-page">
+    <main class="flex-1 py-8">
+      <div class="container-app">
         <slot />
       </div>
     </main>

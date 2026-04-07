@@ -10,107 +10,118 @@ import {
   serverTimestamp,
   updateDoc
 } from 'firebase/firestore'
-import type { Publication } from '~/types/models'
 
-const fallbackPublications: Publication[] = [
+export interface PublicationItem {
+  id: string
+  title: string
+  author: string
+  description: string
+  content: string
+  categoryId: string
+  coverImage: string
+  createdAt?: unknown
+}
+
+const demoPublications: PublicationItem[] = [
   {
     id: 'demo-1',
-    title: 'Основи сучасного JavaScript',
+    title: 'Основи веб-розробки',
     author: 'Олена Коваль',
-    description: 'Короткий вступ до сучасної мови JavaScript для початківців.',
-    content: 'Це демонстраційний текст публікації. Після підключення Firebase тут будуть реальні дані з Firestore.',
-    categoryId: 'demo-1',
-    coverImage: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=1200&q=80',
-    createdAt: '2026-04-07'
+    description: 'Короткий вступ до сучасної веб-розробки та основ побудови інтерфейсів.',
+    content: 'Це демонстраційний текст публікації. Надалі тут буде повний вміст книги або статті.',
+    categoryId: '1',
+    coverImage: ''
   },
   {
     id: 'demo-2',
-    title: 'Візуальна мова цифрових видань',
-    author: 'Марія Сенько',
-    description: 'Стаття про структуру, типографіку та композицію у веб-публікаціях.',
-    content: 'Ще один демонстраційний матеріал для стартового каталогу. Він допомагає одразу побачити, як виглядає сайт.',
-    categoryId: 'demo-2',
-    coverImage: 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=1200&q=80',
-    createdAt: '2026-04-07'
+    title: 'Tailwind CSS для початківців',
+    author: 'Ірина Петренко',
+    description: 'Практичний матеріал для створення адаптивних інтерфейсів за допомогою utility-first підходу.',
+    content: 'Це демонстраційний текст другої публікації. Його можна буде замінити реальним контентом.',
+    categoryId: '2',
+    coverImage: ''
   }
 ]
 
-export const usePublications = () => {
-  const { db, isConfigured } = useFirebase()
-  const publications = useState<Publication[]>('publications-list', () => [])
-  const loading = useState<boolean>('publications-loading', () => false)
+const publicationsState = () => useState<PublicationItem[]>('publications', () => [])
+const currentPublicationState = () => useState<PublicationItem | null>('currentPublication', () => null)
 
-  const fetchPublications = async () => {
-    loading.value = true
+export const usePublications = () => {
+  const { $db } = useNuxtApp()
+  const publications = publicationsState()
+  const currentPublication = currentPublicationState()
+
+  const loadPublications = async () => {
     try {
-      if (!db || !isConfigured) {
-        publications.value = fallbackPublications
+      const q = query(collection($db, 'publications'), orderBy('title'))
+      const snapshot = await getDocs(q)
+
+      publications.value = snapshot.docs.map(docItem => ({
+        id: docItem.id,
+        title: String(docItem.data().title || ''),
+        author: String(docItem.data().author || ''),
+        description: String(docItem.data().description || ''),
+        content: String(docItem.data().content || ''),
+        categoryId: String(docItem.data().categoryId || ''),
+        coverImage: String(docItem.data().coverImage || ''),
+        createdAt: docItem.data().createdAt
+      }))
+
+      if (!publications.value.length) {
+        publications.value = demoPublications
+      }
+    } catch {
+      publications.value = demoPublications
+    }
+  }
+
+  const loadPublicationById = async (id: string) => {
+    try {
+      const snapshot = await getDoc(doc($db, 'publications', id))
+
+      if (snapshot.exists()) {
+        currentPublication.value = {
+          id: snapshot.id,
+          title: String(snapshot.data().title || ''),
+          author: String(snapshot.data().author || ''),
+          description: String(snapshot.data().description || ''),
+          content: String(snapshot.data().content || ''),
+          categoryId: String(snapshot.data().categoryId || ''),
+          coverImage: String(snapshot.data().coverImage || ''),
+          createdAt: snapshot.data().createdAt
+        }
         return
       }
 
-      const snapshot = await getDocs(query(collection(db, 'publications'), orderBy('createdAt', 'desc')))
-      publications.value = snapshot.docs.map((item) => ({
-        id: item.id,
-        ...(item.data() as Omit<Publication, 'id'>)
-      }))
-    } finally {
-      loading.value = false
+      currentPublication.value = publications.value.find(item => item.id === id) || null
+    } catch {
+      currentPublication.value = publications.value.find(item => item.id === id) || null
     }
   }
 
-  const getPublicationById = async (id: string) => {
-    if (!db || !isConfigured) {
-      return publications.value.find((item) => item.id === id) || fallbackPublications.find((item) => item.id === id) || null
-    }
-
-    const snapshot = await getDoc(doc(db, 'publications', id))
-    if (!snapshot.exists()) {
-      return null
-    }
-
-    return {
-      id: snapshot.id,
-      ...(snapshot.data() as Omit<Publication, 'id'>)
-    } as Publication
-  }
-
-  const createPublication = async (payload: Omit<Publication, 'id' | 'createdAt'>) => {
-    if (!db || !isConfigured) {
-      throw new Error('Firebase не налаштований. CRUD стане активним після заповнення .env.')
-    }
-
-    await addDoc(collection(db, 'publications'), {
+  const createPublication = async (payload: Omit<PublicationItem, 'id'>) => {
+    await addDoc(collection($db, 'publications'), {
       ...payload,
-      createdAt: new Date().toISOString(),
-      serverCreatedAt: serverTimestamp()
+      createdAt: serverTimestamp()
     })
-
-    await fetchPublications()
+    await loadPublications()
   }
 
-  const updatePublication = async (id: string, payload: Omit<Publication, 'id' | 'createdAt'>) => {
-    if (!db || !isConfigured) {
-      throw new Error('Firebase не налаштований. CRUD стане активним після заповнення .env.')
-    }
-
-    await updateDoc(doc(db, 'publications', id), payload)
-    await fetchPublications()
+  const updatePublication = async (id: string, payload: Omit<PublicationItem, 'id'>) => {
+    await updateDoc(doc($db, 'publications', id), payload)
+    await loadPublications()
   }
 
   const removePublication = async (id: string) => {
-    if (!db || !isConfigured) {
-      throw new Error('Firebase не налаштований. CRUD стане активним після заповнення .env.')
-    }
-
-    await deleteDoc(doc(db, 'publications', id))
-    await fetchPublications()
+    await deleteDoc(doc($db, 'publications', id))
+    await loadPublications()
   }
 
   return {
     publications,
-    loading,
-    fetchPublications,
-    getPublicationById,
+    currentPublication,
+    loadPublications,
+    loadPublicationById,
     createPublication,
     updatePublication,
     removePublication

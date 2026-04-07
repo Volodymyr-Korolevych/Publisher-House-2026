@@ -1,43 +1,51 @@
 <template>
-  <div class="space-y-6">
-    <div>
-      <h1 class="text-3xl font-semibold">Каталог публікацій</h1>
-      <p class="mt-2 text-slate-500">Стартова сторінка каталогу з пошуком і фільтрацією за категоріями.</p>
+  <section>
+    <div class="mb-8">
+      <h1 class="page-title">Каталог публікацій</h1>
+      <p class="page-subtitle">
+        Перегляд доступних книг, статей та електронних матеріалів.
+      </p>
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-[1fr_280px]">
-      <div class="card p-4">
-        <label class="mb-2 block text-sm font-medium">Пошук за назвою або автором</label>
-        <input v-model="search" class="form-input" placeholder="Наприклад, JavaScript або Олена Коваль" />
-      </div>
-
-      <CategoryFilter v-model="selectedCategory" :categories="categories" />
+    <div class="card mb-6 p-4">
+      <label class="label" for="search">Пошук</label>
+      <input
+        id="search"
+        v-model="search"
+        type="text"
+        class="input"
+        placeholder="Введіть назву або автора"
+      >
     </div>
 
     <div v-if="filteredPublications.length" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-      <PublicationCard v-for="publication in filteredPublications" :key="publication.id" :publication="publication" />
+      <PublicationCard
+        v-for="publication in filteredPublications"
+        :key="publication.id"
+        :publication="publication"
+      />
     </div>
 
-    <div v-else class="card p-10 text-center text-slate-500">
-      За поточними параметрами публікацій не знайдено.
+    <div v-else class="card p-8 text-center text-slate-500">
+      Публікації не знайдено.
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
+const { publications, loadPublications } = usePublications()
 const search = ref('')
-const selectedCategory = ref('')
 
-const { publications, fetchPublications } = usePublications()
-const { categories, fetchCategories } = useCategories()
-
-await Promise.all([fetchPublications(), fetchCategories()])
+await loadPublications()
 
 const filteredPublications = computed(() => {
-  return publications.value.filter((item) => {
-    const matchesSearch = `${item.title} ${item.author}`.toLowerCase().includes(search.value.toLowerCase())
-    const matchesCategory = !selectedCategory.value || item.categoryId === selectedCategory.value
-    return matchesSearch && matchesCategory
-  })
+  const query = search.value.trim().toLowerCase()
+
+  if (!query) return publications.value
+
+  return publications.value.filter(item =>
+    item.title.toLowerCase().includes(query) ||
+    item.author.toLowerCase().includes(query)
+  )
 })
 </script>

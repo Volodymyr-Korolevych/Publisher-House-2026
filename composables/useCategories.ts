@@ -1,90 +1,69 @@
 import {
-  addDoc,
   collection,
+  addDoc,
   deleteDoc,
   doc,
   getDocs,
   orderBy,
   query,
-  serverTimestamp,
   updateDoc
 } from 'firebase/firestore'
-import type { Category } from '~/types/models'
 
-const fallbackCategories: Category[] = [
-  {
-    id: 'demo-1',
-    name: 'Програмування',
-    description: 'Навчальні матеріали з програмування',
-    createdAt: '2026-04-07'
-  },
-  {
-    id: 'demo-2',
-    name: 'Дизайн',
-    description: 'Матеріали про UI, UX і візуальну культуру',
-    createdAt: '2026-04-07'
-  }
+export interface CategoryItem {
+  id: string
+  name: string
+  description: string
+}
+
+const defaultCategories: CategoryItem[] = [
+  { id: '1', name: 'Програмування', description: 'Навчальні матеріали з програмування' },
+  { id: '2', name: 'Дизайн', description: 'Публікації з дизайну та графіки' },
+  { id: '3', name: 'Освіта', description: 'Матеріали для навчання та саморозвитку' }
 ]
 
+const categoriesState = () => useState<CategoryItem[]>('categories', () => [])
+
 export const useCategories = () => {
-  const { db, isConfigured } = useFirebase()
-  const categories = useState<Category[]>('categories-list', () => [])
-  const loading = useState<boolean>('categories-loading', () => false)
+  const { $db } = useNuxtApp()
+  const categories = categoriesState()
 
-  const fetchCategories = async () => {
-    loading.value = true
+  const loadCategories = async () => {
     try {
-      if (!db || !isConfigured) {
-        categories.value = fallbackCategories
-        return
-      }
+      const q = query(collection($db, 'categories'), orderBy('name'))
+      const snapshot = await getDocs(q)
 
-      const snapshot = await getDocs(query(collection(db, 'categories'), orderBy('createdAt', 'desc')))
-      categories.value = snapshot.docs.map((item) => ({
-        id: item.id,
-        ...(item.data() as Omit<Category, 'id'>)
+      categories.value = snapshot.docs.map(docItem => ({
+        id: docItem.id,
+        name: String(docItem.data().name || ''),
+        description: String(docItem.data().description || '')
       }))
-    } finally {
-      loading.value = false
+
+      if (!categories.value.length) {
+        categories.value = defaultCategories
+      }
+    } catch {
+      categories.value = defaultCategories
     }
   }
 
-  const createCategory = async (payload: Pick<Category, 'name' | 'description'>) => {
-    if (!db || !isConfigured) {
-      throw new Error('Firebase не налаштований. CRUD стане активним після заповнення .env.')
-    }
-
-    await addDoc(collection(db, 'categories'), {
-      ...payload,
-      createdAt: new Date().toISOString(),
-      serverCreatedAt: serverTimestamp()
-    })
-
-    await fetchCategories()
+  const createCategory = async (payload: { name: string; description: string }) => {
+    await addDoc(collection($db, 'categories'), payload)
+    await loadCategories()
   }
 
-  const updateCategory = async (id: string, payload: Pick<Category, 'name' | 'description'>) => {
-    if (!db || !isConfigured) {
-      throw new Error('Firebase не налаштований. CRUD стане активним після заповнення .env.')
-    }
-
-    await updateDoc(doc(db, 'categories', id), payload)
-    await fetchCategories()
+  const updateCategory = async (id: string, payload: { name: string; description: string }) => {
+    await updateDoc(doc($db, 'categories', id), payload)
+    await loadCategories()
   }
 
   const removeCategory = async (id: string) => {
-    if (!db || !isConfigured) {
-      throw new Error('Firebase не налаштований. CRUD стане активним після заповнення .env.')
-    }
-
-    await deleteDoc(doc(db, 'categories', id))
-    await fetchCategories()
+    await deleteDoc(doc($db, 'categories', id))
+    await loadCategories()
   }
 
   return {
     categories,
-    loading,
-    fetchCategories,
+    loadCategories,
     createCategory,
     updateCategory,
     removeCategory

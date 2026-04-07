@@ -1,128 +1,90 @@
-import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  type User
-} from 'firebase/auth'
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth'
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
-import type { AppUser, UserRole } from '~/types/models'
 
-const toSerializableDate = () => new Date().toISOString()
+type UserRole = 'user' | 'admin'
+
+interface AuthUser {
+  uid: string
+  name: string
+  email: string
+  role: UserRole
+}
+
+const authUserState = () => useState<AuthUser | null>('authUser', () => null)
+const authReadyState = () => useState<boolean>('authReady', () => false)
+const authInitState = () => useState<boolean>('authInitialized', () => false)
 
 export const useAuth = () => {
-  const { auth, db, isConfigured } = useFirebase()
-  const firebaseUser = useState<User | null>('firebase-user', () => null)
-  const profile = useState<AppUser | null>('auth-profile', () => null)
-  const ready = useState<boolean>('auth-ready', () => false)
+  const { $auth, $db } = useNuxtApp()
+  const user = authUserState()
+  const isReady = authReadyState()
+  const isInitialized = authInitState()
 
-  const role = computed<UserRole>(() => profile.value?.role || 'guest')
-  const isLoggedIn = computed(() => Boolean(firebaseUser.value))
-  const isAdmin = computed(() => role.value === 'admin')
+  const initAuth = () => {
+    if (!process.client || isInitialized.value) return
 
-  const stopListener = () => {
-    // reserved for future TASK updates if we need unsubscribe handling
-  }
+    isInitialized.value = true
 
-  const fetchProfile = async (uid: string) => {
-    if (!db) {
-      profile.value = null
-      return
-    }
+    onAuthStateChanged($auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        user.value = null
+        isReady.value = true
+        return
+      }
 
-    const snapshot = await getDoc(doc(db, 'users', uid))
+      const userRef = doc($db, 'users', firebaseUser.uid)
+      const userSnap = await getDoc(userRef)
 
-    if (!snapshot.exists()) {
-      profile.value = null
-      return
-    }
-
-    const data = snapshot.data() as Omit<AppUser, 'id'>
-    profile.value = {
-      id: uid,
-      ...data
-    }
-  }
-
-  const init = async () => {
-    if (!auth || ready.value) {
-      ready.value = true
-      return
-    }
-
-    await new Promise<void>((resolve) => {
-      onAuthStateChanged(auth, async (user) => {
-        firebaseUser.value = user
-        if (user) {
-          await fetchProfile(user.uid)
-        } else {
-          profile.value = null
+      if (userSnap.exists()) {
+        const data = userSnap.data()
+        user.value = {
+          uid: firebaseUser.uid,
+          name: String(data.name || ''),
+          email: String(data.email || firebaseUser.email || ''),
+          role: (data.role as UserRole) || 'user'
         }
-        ready.value = true
-        resolve()
-      })
+      } else {
+        user.value = {
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || '',
+          email: firebaseUser.email || '',
+          role: 'user'
+        }
+      }
+
+      isReady.value = true
     })
   }
 
-  const register = async (name: string, email: string, password: string) => {
-    if (!auth || !db || !isConfigured) {
-      throw new Error('Firebase не налаштований. Заповни .env файл.')
-    }
+  const register = async (payload: { name: string; email: string; password: string }) => {
+    const credentials = await createUserWithEmailAndPassword($auth, payload.email, payload.password)
 
-    const credential = await createUserWithEmailAndPassword(auth, email, password)
+    await setDoc(doc($db, 'users', credentials.user.uid), {
+      name: payload.name,
+      email: payload.email,
+      role: 'user',
+      createdAt: serverTimestamp()
+    })
 
-    if (credential.user) {
-      await updateProfile(credential.user, { displayName: name })
-      await setDoc(doc(db, 'users', credential.user.uid), {
-        name,
-        email,
-        role: 'user',
-        createdAt: toSerializableDate(),
-        serverCreatedAt: serverTimestamp()
-      })
-      await fetchProfile(credential.user.uid)
-    }
-
-    return credential
+    return credentials.user
   }
 
-  const login = async (email: string, password: string) => {
-    if (!auth || !isConfigured) {
-      throw new Error('Firebase не налаштований. Заповни .env файл.')
-    }
-
-    const credential = await signInWithEmailAndPassword(auth, email, password)
-    if (credential.user) {
-      await fetchProfile(credential.user.uid)
-    }
-
-    return credential
+  const login = async (payload: { email: string; password: string }) => {
+    const credentials = await signInWithEmailAndPassword($auth, payload.email, payload.password)
+    return credentials.user
   }
 
   const logout = async () => {
-    if (!auth) {
-      return
-    }
-
-    await signOut(auth)
-    firebaseUser.value = null
-    profile.value = null
-    stopListener()
-    await navigateTo('/')
+    await signOut($auth)
+    user.value = null
   }
 
   return {
-    firebaseUser,
-    profile,
-    role,
-    isLoggedIn,
-    isAdmin,
-    ready,
-    init,
-    login,
+    user,
+    isReady,
+    initAuth,
     register,
-    logout,
-    fetchProfile
+    login,
+    logout
   }
 }

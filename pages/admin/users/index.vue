@@ -1,22 +1,17 @@
 <template>
-  <NuxtLayout name="admin">
-    <div class="space-y-6">
-      <div>
-        <h1 class="text-3xl font-semibold">Користувачі</h1>
-        <p class="mt-2 text-slate-500">Стартова сторінка для списку користувачів. У наступних TASK тут можна додати зміну ролей і редагування профілів.</p>
-      </div>
+  <section>
+    <h1 class="page-title">Користувачі</h1>
+    <p class="page-subtitle">На цьому етапі підготуємо сторінку для подальшого розвитку функціоналу.</p>
 
-      <div class="card p-6">
-        <div class="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-600">
-          Поточний стартовий шаблон уже містить колекцію <code>users</code> у Firestore. На цьому етапі сторінка підготовлена як місце для подальшого TASK-розширення.
-        </div>
-      </div>
+    <div class="mt-6 card p-6 text-slate-600">
+      Тут буде реалізовано перегляд списку користувачів системи.
     </div>
-  </NuxtLayout>
+  </section>
 </template>
 
 <script setup lang="ts">
 definePageMeta({
-  middleware: ['admin']
+  layout: 'admin',
+  middleware: 'admin'
 })
 </script>

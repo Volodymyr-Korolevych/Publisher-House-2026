@@ -1,24 +1,45 @@
 <template>
   <article class="card overflow-hidden">
-    <img :src="publication.coverImage" :alt="publication.title" class="h-56 w-full object-cover" />
-    <div class="space-y-4 p-5">
-      <div>
-        <p class="text-sm text-brand-700">{{ publication.author }}</p>
-        <h3 class="mt-1 text-xl font-semibold">{{ publication.title }}</h3>
+    <div class="aspect-[16/9] bg-slate-200">
+      <img
+        v-if="publication.coverImage"
+        :src="publication.coverImage"
+        :alt="publication.title"
+        class="h-full w-full object-cover"
+      >
+      <div v-else class="flex h-full items-center justify-center text-sm text-slate-500">
+        Без обкладинки
       </div>
-      <p class="line-clamp-3 text-sm text-slate-600">{{ publication.description }}</p>
-      <div class="flex items-center justify-between gap-3">
-        <span class="text-xs uppercase tracking-wide text-slate-400">{{ publication.createdAt }}</span>
-        <NuxtLink :to="`/publications/${publication.id}`" class="btn-primary">Читати</NuxtLink>
-      </div>
+    </div>
+
+    <div class="p-5">
+      <p class="mb-2 text-xs uppercase tracking-wide text-slate-500">
+        {{ publication.author || 'Невідомий автор' }}
+      </p>
+
+      <h3 class="mb-2 text-xl font-semibold text-slate-900">
+        {{ publication.title }}
+      </h3>
+
+      <p class="mb-4 line-clamp-3 text-sm text-slate-600">
+        {{ publication.description }}
+      </p>
+
+      <NuxtLink :to="`/publications/${publication.id}`" class="btn-primary">
+        Читати
+      </NuxtLink>
     </div>
   </article>
 </template>
 
 <script setup lang="ts">
-import type { Publication } from '~/types/models'
-
 defineProps<{
-  publication: Publication
+  publication: {
+    id: string
+    title: string
+    author?: string
+    description?: string
+    coverImage?: string
+  }
 }>()
 </script>

@@ -1,37 +1,48 @@
 <template>
-  <div v-if="publication" class="space-y-8">
-    <div class="grid gap-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
-      <img :src="publication.coverImage" :alt="publication.title" class="card h-auto w-full object-cover" />
-      <div class="space-y-4">
-        <p class="text-sm font-medium text-brand-700">{{ publication.author }}</p>
-        <h1 class="text-4xl font-bold">{{ publication.title }}</h1>
-        <p class="text-lg text-slate-600">{{ publication.description }}</p>
-        <div class="flex flex-wrap gap-3 text-sm text-slate-500">
-          <span>Дата: {{ publication.createdAt }}</span>
-          <span>Категорія: {{ categoryName }}</span>
+  <section v-if="publication" class="space-y-6">
+    <div class="card overflow-hidden">
+      <div class="aspect-[21/8] bg-slate-200">
+        <img
+          v-if="publication.coverImage"
+          :src="publication.coverImage"
+          :alt="publication.title"
+          class="h-full w-full object-cover"
+        >
+        <div v-else class="flex h-full items-center justify-center text-sm text-slate-500">
+          Без обкладинки
         </div>
+      </div>
+
+      <div class="p-6">
+        <p class="mb-2 text-sm uppercase tracking-wide text-slate-500">
+          {{ publication.author }}
+        </p>
+        <h1 class="page-title">{{ publication.title }}</h1>
+        <p class="mt-3 text-base leading-7 text-slate-600">
+          {{ publication.description }}
+        </p>
       </div>
     </div>
 
-    <article class="card p-6 leading-8 text-slate-700">
-      {{ publication.content }}
-    </article>
-  </div>
+    <div class="card p-6">
+      <h2 class="mb-4 text-xl font-semibold text-slate-900">Текст публікації</h2>
+      <div class="whitespace-pre-line leading-8 text-slate-700">
+        {{ publication.content }}
+      </div>
+    </div>
+  </section>
 
-  <div v-else class="card p-10 text-center text-slate-500">
+  <section v-else class="card p-8 text-center text-slate-500">
     Публікацію не знайдено.
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
 const route = useRoute()
-const { getPublicationById } = usePublications()
-const { categories, fetchCategories } = useCategories()
+const { currentPublication, loadPublicationById, loadPublications } = usePublications()
 
-await fetchCategories()
-const publication = await getPublicationById(route.params.id as string)
+await loadPublications()
+await loadPublicationById(String(route.params.id))
 
-const categoryName = computed(() => {
-  return categories.value.find((item) => item.id === publication?.categoryId)?.name || 'Без категорії'
-})
+const publication = computed(() => currentPublication.value)
 </script>

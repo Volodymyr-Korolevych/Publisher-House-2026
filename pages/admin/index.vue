@@ -1,37 +1,41 @@
 <template>
-  <NuxtLayout name="admin">
-    <div class="space-y-6">
-      <div>
-        <h1 class="text-3xl font-semibold">Огляд адміністративної частини</h1>
-        <p class="mt-2 text-slate-500">Стартовий дашборд адміністратора. Тут уже є навігація на керування публікаціями, категоріями та користувачами.</p>
+  <div>
+    <h1 class="page-title">Адміністративна панель</h1>
+    <p class="page-subtitle">Керування основними сутностями WEB-застосунку.</p>
+
+    <div class="mt-6 grid gap-6 md:grid-cols-3">
+      <div class="card p-5">
+        <p class="text-sm text-slate-500">Публікації</p>
+        <p class="mt-2 text-3xl font-bold text-slate-900">{{ publications.length }}</p>
       </div>
 
-      <div class="grid gap-4 md:grid-cols-3">
-        <div class="card p-5">
-          <p class="text-sm text-slate-500">Публікації</p>
-          <p class="mt-2 text-3xl font-semibold">{{ publications.length }}</p>
-        </div>
-        <div class="card p-5">
-          <p class="text-sm text-slate-500">Категорії</p>
-          <p class="mt-2 text-3xl font-semibold">{{ categories.length }}</p>
-        </div>
-        <div class="card p-5">
-          <p class="text-sm text-slate-500">Статус Firebase</p>
-          <p class="mt-2 text-lg font-semibold">{{ isConfigured ? 'Налаштований' : 'Потрібен .env' }}</p>
-        </div>
+      <div class="card p-5">
+        <p class="text-sm text-slate-500">Категорії</p>
+        <p class="mt-2 text-3xl font-bold text-slate-900">{{ categories.length }}</p>
+      </div>
+
+      <div class="card p-5">
+        <p class="text-sm text-slate-500">Роль</p>
+        <p class="mt-2 text-3xl font-bold uppercase text-slate-900">{{ user?.role || '-' }}</p>
       </div>
     </div>
-  </NuxtLayout>
+  </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({
-  middleware: ['admin']
+  layout: 'admin',
+  middleware: 'admin'
 })
 
-const { publications, fetchPublications } = usePublications()
-const { categories, fetchCategories } = useCategories()
-const { isConfigured } = useFirebase()
+const { user, initAuth } = useAuth()
+const { publications, loadPublications } = usePublications()
+const { categories, loadCategories } = useCategories()
 
-await Promise.all([fetchPublications(), fetchCategories()])
+if (process.client) {
+  initAuth()
+}
+
+await loadPublications()
+await loadCategories()
 </script>

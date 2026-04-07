@@ -1,17 +1,26 @@
 export default defineNuxtRouteMiddleware(async () => {
-  if (import.meta.server) {
-    return
+  const { user, isReady, initAuth } = useAuth()
+
+  if (process.client) {
+    initAuth()
+
+    if (!isReady.value) {
+      await new Promise<void>((resolve) => {
+        const stop = watch(isReady, (value) => {
+          if (value) {
+            stop()
+            resolve()
+          }
+        })
+      })
+    }
   }
 
-  const { isConfigured } = useFirebase()
-  if (!isConfigured) {
-    return
+  if (!user.value) {
+    return navigateTo('/login')
   }
 
-  const { init, isAdmin } = useAuth()
-  await init()
-
-  if (!isAdmin.value) {
+  if (user.value.role !== 'admin') {
     return navigateTo('/')
   }
 })
