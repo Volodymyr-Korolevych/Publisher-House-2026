@@ -1,0 +1,12 @@
+.nuxt
+.output
+.nitro
+.cache
+node_modules
+.env
+.env.*
+!.env.example
+firebase-debug.log*
+yarn-error.log
+.DS_Store
+.vscode
