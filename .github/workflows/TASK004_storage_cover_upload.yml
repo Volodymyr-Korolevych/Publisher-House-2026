@@ -1,0 +1,599 @@
+name: TASK004 - Firebase Storage cover upload
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  task004:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.5
+
+      - name: Write project files
+        shell: bash
+        run: |
+          mkdir -p composables
+          mkdir -p components
+          mkdir -p pages/admin/publications/[id]
+
+          cat > composables/useStorageUpload.ts <<'EOF'
+          import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
+
+          export const useStorageUpload = () => {
+            const { $storage } = useNuxtApp()
+
+            const uploadPublicationCover = async (file: File) => {
+              const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
+              const safeBaseName = file.name
+                .replace(/\.[^/.]+$/, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9а-яіїєґ_-]+/gi, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '')
+
+              const fileName = `${Date.now()}-${safeBaseName || 'cover'}.${extension || 'jpg'}`
+              const fileRef = storageRef($storage, `publication-covers/${fileName}`)
+
+              await uploadBytes(fileRef, file)
+              const downloadURL = await getDownloadURL(fileRef)
+
+              return {
+                path: fileRef.fullPath,
+                url: downloadURL
+              }
+            }
+
+            return {
+              uploadPublicationCover
+            }
+          }
+          EOF
+
+          cat > components/PublicationForm.vue <<'EOF'
+          <template>
+            <form class="space-y-5" @submit.prevent="handleSubmit">
+              <div class="grid gap-5 md:grid-cols-2">
+                <div>
+                  <label class="label" for="title">Назва публікації</label>
+                  <input id="title" v-model="form.title" type="text" class="input" required>
+                </div>
+
+                <div>
+                  <label class="label" for="author">Автор</label>
+                  <input id="author" v-model="form.author" type="text" class="input" required>
+                </div>
+              </div>
+
+              <div>
+                <label class="label" for="description">Короткий опис</label>
+                <textarea
+                  id="description"
+                  v-model="form.description"
+                  class="input min-h-[110px]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label class="label" for="content">Текст публікації</label>
+                <textarea
+                  id="content"
+                  v-model="form.content"
+                  class="input min-h-[260px]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label class="label" for="categoryId">Категорія</label>
+                <select id="categoryId" v-model="form.categoryId" class="input" required>
+                  <option value="" disabled>Оберіть категорію</option>
+                  <option v-for="item in categories" :key="item.id" :value="item.id">
+                    {{ item.name }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div>
+                  <p class="label mb-2">Обкладинка книги</p>
+
+                  <div class="flex flex-col gap-3 md:flex-row md:items-center">
+                    <label class="btn-secondary cursor-pointer">
+                      Оберіть зображення
+                      <input
+                        class="hidden"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/jpg"
+                        @change="handleFileChange"
+                      >
+                    </label>
+
+                    <span class="text-sm text-slate-600">
+                      {{ selectedFileName || 'Файл не вибрано' }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    class="btn-primary"
+                    :disabled="!selectedFile || isUploading"
+                    @click="handleUpload"
+                  >
+                    {{ isUploading ? 'Завантаження...' : 'Завантажити обкладинку' }}
+                  </button>
+
+                  <button
+                    v-if="previewImage"
+                    type="button"
+                    class="btn-secondary"
+                    @click="removeSelectedImage"
+                  >
+                    Видалити вибране зображення
+                  </button>
+                </div>
+
+                <p v-if="uploadMessage" class="text-sm text-slate-600">
+                  {{ uploadMessage }}
+                </p>
+
+                <p v-if="uploadError" class="text-sm text-red-600">
+                  {{ uploadError }}
+                </p>
+
+                <div v-if="previewImage" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <img
+                    :src="previewImage"
+                    alt="Попередній перегляд обкладинки"
+                    class="h-56 w-full object-cover"
+                  >
+                </div>
+              </div>
+
+              <p v-if="errorMessage" class="text-sm text-red-600">
+                {{ errorMessage }}
+              </p>
+
+              <div class="flex flex-wrap gap-3">
+                <button type="submit" class="btn-primary" :disabled="loading">
+                  {{ loading ? submitLoadingText : submitText }}
+                </button>
+
+                <button type="button" class="btn-secondary" @click="$emit('cancel')">
+                  Скасувати
+                </button>
+              </div>
+            </form>
+          </template>
+
+          <script setup lang="ts">
+          import type { CategoryItem } from '~/composables/useCategories'
+          import type { PublicationItem } from '~/composables/usePublications'
+
+          const props = withDefaults(defineProps<{
+            categories: CategoryItem[]
+            initialData?: Partial<PublicationItem> | null
+            submitText?: string
+            submitLoadingText?: string
+          }>(), {
+            initialData: null,
+            submitText: 'Зберегти',
+            submitLoadingText: 'Збереження...'
+          })
+
+          const emit = defineEmits<{
+            submit: [payload: Omit<PublicationItem, 'id'>]
+            cancel: []
+          }>()
+
+          const { uploadPublicationCover } = useStorageUpload()
+
+          const form = reactive<Omit<PublicationItem, 'id'>>({
+            title: props.initialData?.title || '',
+            author: props.initialData?.author || '',
+            description: props.initialData?.description || '',
+            content: props.initialData?.content || '',
+            categoryId: props.initialData?.categoryId || '',
+            coverImage: props.initialData?.coverImage || '',
+            createdAt: props.initialData?.createdAt || null
+          })
+
+          const loading = ref(false)
+          const errorMessage = ref('')
+          const uploadError = ref('')
+          const uploadMessage = ref('')
+          const isUploading = ref(false)
+          const selectedFile = ref<File | null>(null)
+          const selectedFileName = ref('')
+          const localPreviewUrl = ref('')
+
+          const previewImage = computed(() => {
+            return localPreviewUrl.value || form.coverImage || ''
+          })
+
+          watch(
+            () => props.initialData,
+            (value) => {
+              form.title = value?.title || ''
+              form.author = value?.author || ''
+              form.description = value?.description || ''
+              form.content = value?.content || ''
+              form.categoryId = value?.categoryId || ''
+              form.coverImage = value?.coverImage || ''
+              form.createdAt = value?.createdAt || null
+            },
+            { deep: true }
+          )
+
+          onBeforeUnmount(() => {
+            if (localPreviewUrl.value) {
+              URL.revokeObjectURL(localPreviewUrl.value)
+            }
+          })
+
+          const handleFileChange = (event: Event) => {
+            uploadError.value = ''
+            uploadMessage.value = ''
+
+            const input = event.target as HTMLInputElement
+            const file = input.files?.[0]
+
+            if (!file) return
+
+            if (!file.type.startsWith('image/')) {
+              uploadError.value = 'Будь ласка, оберіть файл зображення.'
+              return
+            }
+
+            selectedFile.value = file
+            selectedFileName.value = file.name
+
+            if (localPreviewUrl.value) {
+              URL.revokeObjectURL(localPreviewUrl.value)
+            }
+
+            localPreviewUrl.value = URL.createObjectURL(file)
+          }
+
+          const handleUpload = async () => {
+            uploadError.value = ''
+            uploadMessage.value = ''
+
+            if (!selectedFile.value) {
+              uploadError.value = 'Спочатку оберіть зображення.'
+              return
+            }
+
+            isUploading.value = true
+            uploadMessage.value = 'Зображення завантажується до Firebase Storage...'
+
+            try {
+              const result = await uploadPublicationCover(selectedFile.value)
+              form.coverImage = result.url
+              uploadMessage.value = 'Обкладинку успішно завантажено.'
+            } catch (error: any) {
+              uploadError.value = error?.message || 'Не вдалося завантажити обкладинку.'
+            } finally {
+              isUploading.value = false
+            }
+          }
+
+          const removeSelectedImage = () => {
+            selectedFile.value = null
+            selectedFileName.value = ''
+            uploadError.value = ''
+            uploadMessage.value = ''
+            form.coverImage = ''
+
+            if (localPreviewUrl.value) {
+              URL.revokeObjectURL(localPreviewUrl.value)
+              localPreviewUrl.value = ''
+            }
+          }
+
+          const handleSubmit = async () => {
+            errorMessage.value = ''
+
+            if (!form.title.trim()) {
+              errorMessage.value = 'Вкажіть назву публікації.'
+              return
+            }
+
+            if (!form.author.trim()) {
+              errorMessage.value = 'Вкажіть автора.'
+              return
+            }
+
+            if (!form.description.trim()) {
+              errorMessage.value = 'Вкажіть короткий опис.'
+              return
+            }
+
+            if (!form.content.trim()) {
+              errorMessage.value = 'Вкажіть текст публікації.'
+              return
+            }
+
+            if (!form.categoryId) {
+              errorMessage.value = 'Оберіть категорію.'
+              return
+            }
+
+            loading.value = true
+
+            try {
+              emit('submit', {
+                title: form.title.trim(),
+                author: form.author.trim(),
+                description: form.description.trim(),
+                content: form.content.trim(),
+                categoryId: form.categoryId,
+                coverImage: form.coverImage.trim(),
+                createdAt: form.createdAt || null
+              })
+            } finally {
+              setTimeout(() => {
+                loading.value = false
+              }, 300)
+            }
+          }
+          </script>
+          EOF
+
+          cat > pages/admin/publications/create.vue <<'EOF'
+          <template>
+            <section>
+              <div class="mb-6">
+                <h1 class="page-title">Додавання публікації</h1>
+                <p class="page-subtitle">Створення нового запису в каталозі інтернет-видавництва.</p>
+              </div>
+
+              <div class="card p-6">
+                <PublicationForm
+                  :categories="categories"
+                  submit-text="Створити публікацію"
+                  submit-loading-text="Створення..."
+                  @submit="handleCreate"
+                  @cancel="handleCancel"
+                />
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          import type { PublicationItem } from '~/composables/usePublications'
+
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+
+          const { categories, loadCategories } = useCategories()
+          const { createPublication } = usePublications()
+
+          await loadCategories()
+
+          const handleCreate = async (payload: Omit<PublicationItem, 'id'>) => {
+            try {
+              await createPublication(payload)
+              await navigateTo('/admin/publications')
+            } catch (error) {
+              console.error(error)
+              alert('Не вдалося створити публікацію.')
+            }
+          }
+
+          const handleCancel = async () => {
+            await navigateTo('/admin/publications')
+          }
+          </script>
+          EOF
+
+          cat > pages/admin/publications/[id]/edit.vue <<'EOF'
+          <template>
+            <section>
+              <div class="mb-6">
+                <h1 class="page-title">Редагування публікації</h1>
+                <p class="page-subtitle">Оновлення даних електронної публікації.</p>
+              </div>
+
+              <div v-if="publication" class="card p-6">
+                <PublicationForm
+                  :categories="categories"
+                  :initial-data="publication"
+                  submit-text="Зберегти зміни"
+                  submit-loading-text="Збереження..."
+                  @submit="handleUpdate"
+                  @cancel="handleCancel"
+                />
+              </div>
+
+              <div v-else class="card p-8 text-center text-slate-500">
+                Публікацію не знайдено.
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          import type { PublicationItem } from '~/composables/usePublications'
+
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+
+          const route = useRoute()
+          const { categories, loadCategories } = useCategories()
+          const { currentPublication, loadPublications, loadPublicationById, updatePublication } = usePublications()
+
+          await loadCategories()
+          await loadPublications()
+          await loadPublicationById(String(route.params.id))
+
+          const publication = computed(() => currentPublication.value)
+
+          const handleUpdate = async (payload: Omit<PublicationItem, 'id'>) => {
+            try {
+              await updatePublication(String(route.params.id), payload)
+              await navigateTo('/admin/publications')
+            } catch (error) {
+              console.error(error)
+              alert('Не вдалося оновити публікацію.')
+            }
+          }
+
+          const handleCancel = async () => {
+            await navigateTo('/admin/publications')
+          }
+          </script>
+          EOF
+
+          cat > pages/admin/publications/index.vue <<'EOF'
+          <template>
+            <section>
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h1 class="page-title">Керування публікаціями</h1>
+                  <p class="page-subtitle">Створення, редагування та видалення електронних публікацій.</p>
+                </div>
+
+                <NuxtLink to="/admin/publications/create" class="btn-primary">
+                  Додати публікацію
+                </NuxtLink>
+              </div>
+
+              <div class="mt-6 card p-4">
+                <label class="label" for="search">Пошук у списку</label>
+                <input
+                  id="search"
+                  v-model="search"
+                  type="text"
+                  class="input"
+                  placeholder="Введіть назву або автора"
+                >
+              </div>
+
+              <div v-if="filteredPublications.length" class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-50">
+                    <tr>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Обкладинка</th>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Назва</th>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Автор</th>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Категорія</th>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Дії</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="item in filteredPublications"
+                      :key="item.id"
+                      class="border-t border-slate-200 align-top"
+                    >
+                      <td class="px-4 py-3">
+                        <div class="h-16 w-12 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
+                          <img
+                            v-if="item.coverImage"
+                            :src="item.coverImage"
+                            :alt="item.title"
+                            class="h-full w-full object-cover"
+                          >
+                          <div v-else class="flex h-full items-center justify-center text-[10px] text-slate-400">
+                            Немає
+                          </div>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3 text-slate-900">{{ item.title }}</td>
+                      <td class="px-4 py-3 text-slate-600">{{ item.author }}</td>
+                      <td class="px-4 py-3 text-slate-600">{{ getCategoryName(item.categoryId) }}</td>
+                      <td class="px-4 py-3">
+                        <div class="flex flex-wrap gap-2">
+                          <NuxtLink :to="`/admin/publications/${item.id}/edit`" class="btn-secondary">
+                            Редагувати
+                          </NuxtLink>
+
+                          <button class="btn-secondary text-red-600" @click="handleDelete(item.id)">
+                            Видалити
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div v-else class="mt-6 card p-8 text-center text-slate-500">
+                Публікації не знайдено.
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+
+          const { loadPublications, publications, removePublication } = usePublications()
+          const { categories, loadCategories } = useCategories()
+
+          const search = ref('')
+
+          await loadCategories()
+          await loadPublications()
+
+          const getCategoryName = (categoryId: string) => {
+            return categories.value.find(item => item.id === categoryId)?.name || '—'
+          }
+
+          const filteredPublications = computed(() => {
+            const query = search.value.trim().toLowerCase()
+
+            if (!query) return publications.value
+
+            return publications.value.filter(item =>
+              item.title.toLowerCase().includes(query) ||
+              item.author.toLowerCase().includes(query)
+            )
+          })
+
+          const handleDelete = async (id: string) => {
+            if (!confirm('Видалити цю публікацію?')) return
+
+            try {
+              await removePublication(id)
+            } catch (error) {
+              console.error(error)
+              alert('Не вдалося видалити публікацію.')
+            }
+          }
+          </script>
+          EOF
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
+
+      - name: Commit and push changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .
+          git diff --cached --quiet || git commit -m "TASK004: add Firebase Storage cover upload with Ukrainian UI"
+          git push
