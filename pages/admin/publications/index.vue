@@ -26,6 +26,7 @@
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50">
           <tr>
+            <th class="px-4 py-3 text-left font-semibold text-slate-700">Обкладинка</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-700">Назва</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-700">Автор</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-700">Категорія</th>
@@ -38,6 +39,19 @@
             :key="item.id"
             class="border-t border-slate-200 align-top"
           >
+            <td class="px-4 py-3">
+              <div class="h-16 w-12 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
+                <img
+                  v-if="item.coverImage"
+                  :src="item.coverImage"
+                  :alt="item.title"
+                  class="h-full w-full object-cover"
+                >
+                <div v-else class="flex h-full items-center justify-center text-[10px] text-slate-400">
+                  Немає
+                </div>
+              </div>
+            </td>
             <td class="px-4 py-3 text-slate-900">{{ item.title }}</td>
             <td class="px-4 py-3 text-slate-600">{{ item.author }}</td>
             <td class="px-4 py-3 text-slate-600">{{ getCategoryName(item.categoryId) }}</td>
