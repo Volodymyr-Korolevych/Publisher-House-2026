@@ -1,0 +1,254 @@
+name: TASK005 - Readonly users list from Firestore
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  task005:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.5
+
+      - name: Write project files
+        shell: bash
+        run: |
+          mkdir -p composables
+          mkdir -p pages/admin/users
+
+          cat > composables/useUsers.ts <<'EOF'
+          import { collection, getDocs, orderBy, query } from 'firebase/firestore'
+
+          export interface UserItem {
+            id: string
+            name: string
+            email: string
+            role: string
+            createdAt?: unknown
+          }
+
+          const usersState = () => useState<UserItem[]>('users', () => [])
+
+          const formatFallbackDate = () => {
+            return new Date().toISOString()
+          }
+
+          export const useUsers = () => {
+            const { $db } = useNuxtApp()
+            const users = usersState()
+
+            const loadUsers = async () => {
+              try {
+                const q = query(collection($db, 'users'), orderBy('createdAt', 'desc'))
+                const snapshot = await getDocs(q)
+
+                users.value = snapshot.docs.map((docItem) => ({
+                  id: docItem.id,
+                  name: String(docItem.data().name || ''),
+                  email: String(docItem.data().email || ''),
+                  role: String(docItem.data().role || 'user'),
+                  createdAt: docItem.data().createdAt || formatFallbackDate()
+                }))
+              } catch {
+                users.value = []
+              }
+            }
+
+            const formatUserRole = (role: string) => {
+              if (role === 'admin') return 'Адміністратор'
+              if (role === 'user') return 'Користувач'
+              return role || 'Не вказано'
+            }
+
+            const formatCreatedAt = (value: any) => {
+              if (!value) return '—'
+
+              try {
+                if (typeof value?.toDate === 'function') {
+                  return new Intl.DateTimeFormat('uk-UA', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }).format(value.toDate())
+                }
+
+                if (typeof value === 'string' || value instanceof Date) {
+                  return new Intl.DateTimeFormat('uk-UA', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }).format(new Date(value))
+                }
+
+                return '—'
+              } catch {
+                return '—'
+              }
+            }
+
+            return {
+              users,
+              loadUsers,
+              formatUserRole,
+              formatCreatedAt
+            }
+          }
+          EOF
+
+          cat > pages/admin/users/index.vue <<'EOF'
+          <template>
+            <section>
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h1 class="page-title">Користувачі системи</h1>
+                  <p class="page-subtitle">
+                    Перегляд зареєстрованих користувачів із бази даних Firestore.
+                  </p>
+                </div>
+
+                <button class="btn-secondary" @click="handleReload">
+                  Оновити список
+                </button>
+              </div>
+
+              <div class="mt-6 grid gap-4 md:grid-cols-3">
+                <div class="card p-5">
+                  <p class="text-sm text-slate-500">Усього користувачів</p>
+                  <p class="mt-2 text-3xl font-bold text-slate-900">{{ users.length }}</p>
+                </div>
+
+                <div class="card p-5">
+                  <p class="text-sm text-slate-500">Адміністраторів</p>
+                  <p class="mt-2 text-3xl font-bold text-slate-900">{{ adminCount }}</p>
+                </div>
+
+                <div class="card p-5">
+                  <p class="text-sm text-slate-500">Звичайних користувачів</p>
+                  <p class="mt-2 text-3xl font-bold text-slate-900">{{ userCount }}</p>
+                </div>
+              </div>
+
+              <div class="mt-6 card p-4">
+                <label class="label" for="search">Пошук користувача</label>
+                <input
+                  id="search"
+                  v-model="search"
+                  type="text"
+                  class="input"
+                  placeholder="Введіть ім’я або email"
+                >
+              </div>
+
+              <div v-if="filteredUsers.length" class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-50">
+                    <tr>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Ім’я</th>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Email</th>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Роль</th>
+                      <th class="px-4 py-3 text-left font-semibold text-slate-700">Дата створення</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="item in filteredUsers"
+                      :key="item.id"
+                      class="border-t border-slate-200"
+                    >
+                      <td class="px-4 py-3 text-slate-900">
+                        {{ item.name || 'Не вказано' }}
+                      </td>
+                      <td class="px-4 py-3 text-slate-600">
+                        {{ item.email || 'Не вказано' }}
+                      </td>
+                      <td class="px-4 py-3">
+                        <span
+                          :class="[
+                            'inline-flex rounded-full px-3 py-1 text-xs font-semibold',
+                            item.role === 'admin'
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-slate-100 text-slate-700'
+                          ]"
+                        >
+                          {{ formatUserRole(item.role) }}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-slate-600">
+                        {{ formatCreatedAt(item.createdAt) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div v-else class="mt-6 card p-8 text-center text-slate-500">
+                Користувачів не знайдено.
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+
+          const { users, loadUsers, formatUserRole, formatCreatedAt } = useUsers()
+
+          const search = ref('')
+
+          await loadUsers()
+
+          const filteredUsers = computed(() => {
+            const query = search.value.trim().toLowerCase()
+
+            if (!query) return users.value
+
+            return users.value.filter((item) =>
+              item.name.toLowerCase().includes(query) ||
+              item.email.toLowerCase().includes(query)
+            )
+          })
+
+          const adminCount = computed(() => {
+            return users.value.filter((item) => item.role === 'admin').length
+          })
+
+          const userCount = computed(() => {
+            return users.value.filter((item) => item.role === 'user').length
+          })
+
+          const handleReload = async () => {
+            await loadUsers()
+          }
+          </script>
+          EOF
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
+
+      - name: Commit and push changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .
+          git diff --cached --quiet || git commit -m "TASK005: add readonly Firestore users list for admin panel"
+          git push
