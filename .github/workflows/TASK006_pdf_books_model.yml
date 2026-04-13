@@ -1,0 +1,187 @@
+name: TASK006 - PDF books model and download logic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  task006:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.5
+
+      - name: Write files
+        run: |
+          mkdir -p composables
+
+          # ===== useStorageUpload (PDF + cover) =====
+          cat > composables/useStorageUpload.ts <<'EOF'
+          import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+
+          export const useStorageUpload = () => {
+            const { $storage } = useNuxtApp()
+
+            const uploadFile = async (file: File, folder: string) => {
+              const fileRef = ref($storage, `${folder}/${Date.now()}-${file.name}`)
+              await uploadBytes(fileRef, file)
+              const url = await getDownloadURL(fileRef)
+              return url
+            }
+
+            return {
+              uploadCover: (file: File) => uploadFile(file, 'covers'),
+              uploadBook: (file: File) => uploadFile(file, 'books')
+            }
+          }
+          EOF
+
+          # ===== usePublications =====
+          cat > composables/usePublications.ts <<'EOF'
+          import {
+            addDoc, collection, deleteDoc, doc,
+            getDocs, updateDoc, serverTimestamp
+          } from 'firebase/firestore'
+
+          export const usePublications = () => {
+            const { $db } = useNuxtApp()
+            const publications = useState<any[]>('publications', () => [])
+
+            const loadPublications = async () => {
+              const snap = await getDocs(collection($db, 'publications'))
+              publications.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+            }
+
+            const createPublication = async (data: any) => {
+              await addDoc(collection($db, 'publications'), {
+                ...data,
+                downloadsCount: 0,
+                ratingAverage: 0,
+                ratingsCount: 0,
+                createdAt: serverTimestamp()
+              })
+            }
+
+            const updatePublication = async (id: string, data: any) => {
+              await updateDoc(doc($db, 'publications', id), data)
+            }
+
+            const removePublication = async (id: string) => {
+              await deleteDoc(doc($db, 'publications', id))
+            }
+
+            return {
+              publications,
+              loadPublications,
+              createPublication,
+              updatePublication,
+              removePublication
+            }
+          }
+          EOF
+
+          # ===== PublicationForm =====
+          cat > components/PublicationForm.vue <<'EOF'
+          <template>
+            <form @submit.prevent="submit">
+              <input v-model="form.title" placeholder="Назва" class="input" />
+              <input v-model="form.author" placeholder="Автор" class="input" />
+              <textarea v-model="form.description" placeholder="Опис" class="input"/>
+
+              <label class="label">Обкладинка</label>
+              <input type="file" @change="uploadCoverFile" />
+
+              <label class="label">PDF книга</label>
+              <input type="file" accept="application/pdf" @change="uploadBookFile" />
+
+              <button class="btn-primary mt-4">
+                Зберегти
+              </button>
+            </form>
+          </template>
+
+          <script setup>
+          const emit = defineEmits(['submit'])
+          const { uploadCover, uploadBook } = useStorageUpload()
+
+          const form = reactive({
+            title: '',
+            author: '',
+            description: '',
+            coverImage: '',
+            bookFileUrl: '',
+            bookFileName: ''
+          })
+
+          const uploadCoverFile = async (e) => {
+            const file = e.target.files[0]
+            form.coverImage = await uploadCover(file)
+          }
+
+          const uploadBookFile = async (e) => {
+            const file = e.target.files[0]
+            form.bookFileUrl = await uploadBook(file)
+            form.bookFileName = file.name
+          }
+
+          const submit = () => {
+            emit('submit', form)
+          }
+          </script>
+          EOF
+
+          # ===== Public page =====
+          cat > pages/publications/[id].vue <<'EOF'
+          <template>
+            <div v-if="book">
+              <h1>{{ book.title }}</h1>
+              <p>{{ book.author }}</p>
+              <p>{{ book.description }}</p>
+
+              <p>Завантажень: {{ book.downloadsCount }}</p>
+              <p>Рейтинг: {{ book.ratingAverage }}</p>
+
+              <button @click="handleDownload" class="btn-primary">
+                Завантажити книгу
+              </button>
+            </div>
+          </template>
+
+          <script setup>
+          const route = useRoute()
+          const { publications, loadPublications } = usePublications()
+          const { user } = useAuth()
+
+          await loadPublications()
+
+          const book = computed(() =>
+            publications.value.find(p => p.id === route.params.id)
+          )
+
+          const handleDownload = () => {
+            if (!user.value) {
+              navigateTo('/login')
+              return
+            }
+
+            window.open(book.value.bookFileUrl, '_blank')
+          }
+          </script>
+          EOF
+
+      - run: yarn install --frozen-lockfile
+      - run: yarn build
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "TASK006: switch to PDF books model with downloads"
+          git push
