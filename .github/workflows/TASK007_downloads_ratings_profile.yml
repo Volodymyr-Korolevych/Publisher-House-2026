@@ -1,0 +1,1101 @@
+name: TASK007 - Downloads, ratings and user profile
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  task007:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.5
+
+      - name: Write project files
+        shell: bash
+        run: |
+          mkdir -p composables
+          mkdir -p components
+          mkdir -p pages/publications
+          mkdir -p pages/admin/publications/[id]
+
+          cat > composables/usePublications.ts <<'EOF'
+          import {
+            addDoc,
+            collection,
+            deleteDoc,
+            doc,
+            getDoc,
+            getDocs,
+            orderBy,
+            query,
+            serverTimestamp,
+            updateDoc
+          } from 'firebase/firestore'
+
+          export interface PublicationItem {
+            id: string
+            title: string
+            author: string
+            description: string
+            categoryId: string
+            coverImage: string
+            bookFileUrl: string
+            bookFileName: string
+            downloadsCount: number
+            ratingAverage: number
+            ratingsCount: number
+            createdAt?: unknown
+          }
+
+          const demoPublications: PublicationItem[] = [
+            {
+              id: 'demo-1',
+              title: 'Основи веб-розробки',
+              author: 'Олена Коваль',
+              description: 'Короткий вступ до сучасної веб-розробки та основ побудови інтерфейсів.',
+              categoryId: '1',
+              coverImage: '',
+              bookFileUrl: '',
+              bookFileName: '',
+              downloadsCount: 0,
+              ratingAverage: 0,
+              ratingsCount: 0
+            },
+            {
+              id: 'demo-2',
+              title: 'Tailwind CSS для початківців',
+              author: 'Ірина Петренко',
+              description: 'Практичний матеріал для створення адаптивних інтерфейсів за допомогою utility-first підходу.',
+              categoryId: '2',
+              coverImage: '',
+              bookFileUrl: '',
+              bookFileName: '',
+              downloadsCount: 0,
+              ratingAverage: 0,
+              ratingsCount: 0
+            }
+          ]
+
+          const publicationsState = () => useState<PublicationItem[]>('publications', () => [])
+          const currentPublicationState = () => useState<PublicationItem | null>('currentPublication', () => null)
+
+          export const usePublications = () => {
+            const { $db } = useNuxtApp()
+            const publications = publicationsState()
+            const currentPublication = currentPublicationState()
+
+            const normalizePublication = (id: string, data: Record<string, any>): PublicationItem => ({
+              id,
+              title: String(data.title || ''),
+              author: String(data.author || ''),
+              description: String(data.description || ''),
+              categoryId: String(data.categoryId || ''),
+              coverImage: String(data.coverImage || ''),
+              bookFileUrl: String(data.bookFileUrl || ''),
+              bookFileName: String(data.bookFileName || ''),
+              downloadsCount: Number(data.downloadsCount || 0),
+              ratingAverage: Number(data.ratingAverage || 0),
+              ratingsCount: Number(data.ratingsCount || 0),
+              createdAt: data.createdAt
+            })
+
+            const loadPublications = async () => {
+              try {
+                const q = query(collection($db, 'publications'), orderBy('title'))
+                const snapshot = await getDocs(q)
+
+                publications.value = snapshot.docs.map((docItem) =>
+                  normalizePublication(docItem.id, docItem.data())
+                )
+
+                if (!publications.value.length) {
+                  publications.value = demoPublications
+                }
+              } catch {
+                publications.value = demoPublications
+              }
+            }
+
+            const loadPublicationById = async (id: string) => {
+              try {
+                const snapshot = await getDoc(doc($db, 'publications', id))
+
+                if (snapshot.exists()) {
+                  currentPublication.value = normalizePublication(snapshot.id, snapshot.data())
+                  return
+                }
+
+                currentPublication.value = publications.value.find((item) => item.id === id) || null
+              } catch {
+                currentPublication.value = publications.value.find((item) => item.id === id) || null
+              }
+            }
+
+            const createPublication = async (payload: Omit<PublicationItem, 'id'>) => {
+              await addDoc(collection($db, 'publications'), {
+                title: payload.title,
+                author: payload.author,
+                description: payload.description,
+                categoryId: payload.categoryId,
+                coverImage: payload.coverImage,
+                bookFileUrl: payload.bookFileUrl,
+                bookFileName: payload.bookFileName,
+                downloadsCount: 0,
+                ratingAverage: 0,
+                ratingsCount: 0,
+                createdAt: serverTimestamp()
+              })
+
+              await loadPublications()
+            }
+
+            const updatePublication = async (id: string, payload: Omit<PublicationItem, 'id'>) => {
+              await updateDoc(doc($db, 'publications', id), {
+                title: payload.title,
+                author: payload.author,
+                description: payload.description,
+                categoryId: payload.categoryId,
+                coverImage: payload.coverImage,
+                bookFileUrl: payload.bookFileUrl,
+                bookFileName: payload.bookFileName
+              })
+
+              await loadPublications()
+            }
+
+            const updatePublicationStats = async (
+              id: string,
+              payload: { downloadsCount?: number; ratingAverage?: number; ratingsCount?: number }
+            ) => {
+              await updateDoc(doc($db, 'publications', id), payload)
+              await loadPublications()
+            }
+
+            const removePublication = async (id: string) => {
+              await deleteDoc(doc($db, 'publications', id))
+              await loadPublications()
+            }
+
+            return {
+              publications,
+              currentPublication,
+              loadPublications,
+              loadPublicationById,
+              createPublication,
+              updatePublication,
+              updatePublicationStats,
+              removePublication
+            }
+          }
+          EOF
+
+          cat > composables/useUserBooks.ts <<'EOF'
+          import {
+            collection,
+            doc,
+            getDoc,
+            getDocs,
+            increment,
+            query,
+            serverTimestamp,
+            setDoc,
+            updateDoc,
+            where
+          } from 'firebase/firestore'
+
+          export interface UserBookItem {
+            id: string
+            userId: string
+            publicationId: string
+            downloadedAt?: unknown
+            rating: number | null
+          }
+
+          const userBooksState = () => useState<UserBookItem[]>('userBooks', () => [])
+
+          export const useUserBooks = () => {
+            const { $db } = useNuxtApp()
+            const userBooks = userBooksState()
+
+            const normalizeUserBook = (id: string, data: Record<string, any>): UserBookItem => ({
+              id,
+              userId: String(data.userId || ''),
+              publicationId: String(data.publicationId || ''),
+              downloadedAt: data.downloadedAt,
+              rating: typeof data.rating === 'number' ? data.rating : null
+            })
+
+            const loadUserBooks = async (userId: string) => {
+              try {
+                const q = query(collection($db, 'user_books'), where('userId', '==', userId))
+                const snapshot = await getDocs(q)
+
+                userBooks.value = snapshot.docs.map((docItem) =>
+                  normalizeUserBook(docItem.id, docItem.data())
+                )
+              } catch {
+                userBooks.value = []
+              }
+            }
+
+            const recordDownload = async (userId: string, publicationId: string) => {
+              const documentId = `${userId}_${publicationId}`
+              const userBookRef = doc($db, 'user_books', documentId)
+              const publicationRef = doc($db, 'publications', publicationId)
+
+              const existing = await getDoc(userBookRef)
+
+              if (!existing.exists()) {
+                await setDoc(userBookRef, {
+                  userId,
+                  publicationId,
+                  downloadedAt: serverTimestamp(),
+                  rating: null
+                })
+
+                await updateDoc(publicationRef, {
+                  downloadsCount: increment(1)
+                })
+              }
+            }
+
+            const setRating = async (userId: string, publicationId: string, rating: number) => {
+              const documentId = `${userId}_${publicationId}`
+              const userBookRef = doc($db, 'user_books', documentId)
+
+              await setDoc(
+                userBookRef,
+                {
+                  userId,
+                  publicationId,
+                  downloadedAt: serverTimestamp(),
+                  rating
+                },
+                { merge: true }
+              )
+
+              const q = query(collection($db, 'user_books'), where('publicationId', '==', publicationId))
+              const snapshot = await getDocs(q)
+
+              const ratings = snapshot.docs
+                .map((docItem) => docItem.data().rating)
+                .filter((value) => typeof value === 'number' && value >= 1 && value <= 5)
+
+              const ratingsCount = ratings.length
+              const ratingAverage = ratingsCount
+                ? Number((ratings.reduce((sum, item) => sum + item, 0) / ratingsCount).toFixed(2))
+                : 0
+
+              await updateDoc(doc($db, 'publications', publicationId), {
+                ratingAverage,
+                ratingsCount
+              })
+
+              await loadUserBooks(userId)
+            }
+
+            const getUserBookRecord = (userId: string, publicationId: string) => {
+              return userBooks.value.find(
+                (item) => item.userId === userId && item.publicationId === publicationId
+              ) || null
+            }
+
+            return {
+              userBooks,
+              loadUserBooks,
+              recordDownload,
+              setRating,
+              getUserBookRecord
+            }
+          }
+          EOF
+
+          cat > components/PublicationForm.vue <<'EOF'
+          <template>
+            <form class="space-y-5" @submit.prevent="handleSubmit">
+              <div class="grid gap-5 md:grid-cols-2">
+                <div>
+                  <label class="label" for="title">Назва книги</label>
+                  <input id="title" v-model="form.title" type="text" class="input" required>
+                </div>
+
+                <div>
+                  <label class="label" for="author">Автор</label>
+                  <input id="author" v-model="form.author" type="text" class="input" required>
+                </div>
+              </div>
+
+              <div>
+                <label class="label" for="description">Короткий опис</label>
+                <textarea
+                  id="description"
+                  v-model="form.description"
+                  class="input min-h-[110px]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label class="label" for="categoryId">Категорія</label>
+                <select id="categoryId" v-model="form.categoryId" class="input" required>
+                  <option value="" disabled>Оберіть категорію</option>
+                  <option v-for="item in categories" :key="item.id" :value="item.id">
+                    {{ item.name }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p class="label mb-2">Обкладинка книги</p>
+
+                <div class="flex flex-col gap-3 md:flex-row md:items-center">
+                  <label class="btn-secondary cursor-pointer">
+                    Оберіть зображення
+                    <input
+                      class="hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/jpg"
+                      @change="handleCoverChange"
+                    >
+                  </label>
+
+                  <span class="text-sm text-slate-600">
+                    {{ selectedCoverName || 'Файл не вибрано' }}
+                  </span>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    class="btn-primary"
+                    :disabled="!selectedCoverFile || isUploadingCover"
+                    @click="handleCoverUpload"
+                  >
+                    {{ isUploadingCover ? 'Завантаження...' : 'Завантажити обкладинку' }}
+                  </button>
+                </div>
+
+                <p v-if="coverUploadMessage" class="text-sm text-slate-600">
+                  {{ coverUploadMessage }}
+                </p>
+
+                <p v-if="coverUploadError" class="text-sm text-red-600">
+                  {{ coverUploadError }}
+                </p>
+
+                <div v-if="form.coverImage" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <img
+                    :src="form.coverImage"
+                    alt="Попередній перегляд обкладинки"
+                    class="h-56 w-full object-cover"
+                  >
+                </div>
+              </div>
+
+              <div class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p class="label mb-2">PDF-файл книги</p>
+
+                <div class="flex flex-col gap-3 md:flex-row md:items-center">
+                  <label class="btn-secondary cursor-pointer">
+                    Оберіть PDF-файл
+                    <input
+                      class="hidden"
+                      type="file"
+                      accept="application/pdf"
+                      @change="handleBookChange"
+                    >
+                  </label>
+
+                  <span class="text-sm text-slate-600">
+                    {{ selectedBookName || form.bookFileName || 'Файл не вибрано' }}
+                  </span>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    class="btn-primary"
+                    :disabled="!selectedBookFile || isUploadingBook"
+                    @click="handleBookUpload"
+                  >
+                    {{ isUploadingBook ? 'Завантаження...' : 'Завантажити PDF' }}
+                  </button>
+                </div>
+
+                <p v-if="bookUploadMessage" class="text-sm text-slate-600">
+                  {{ bookUploadMessage }}
+                </p>
+
+                <p v-if="bookUploadError" class="text-sm text-red-600">
+                  {{ bookUploadError }}
+                </p>
+
+                <p v-if="form.bookFileName" class="text-sm text-slate-700">
+                  Поточний файл: <span class="font-medium">{{ form.bookFileName }}</span>
+                </p>
+              </div>
+
+              <p v-if="errorMessage" class="text-sm text-red-600">
+                {{ errorMessage }}
+              </p>
+
+              <div class="flex flex-wrap gap-3">
+                <button type="submit" class="btn-primary" :disabled="loading">
+                  {{ loading ? submitLoadingText : submitText }}
+                </button>
+
+                <button type="button" class="btn-secondary" @click="$emit('cancel')">
+                  Скасувати
+                </button>
+              </div>
+            </form>
+          </template>
+
+          <script setup lang="ts">
+          import type { CategoryItem } from '~/composables/useCategories'
+          import type { PublicationItem } from '~/composables/usePublications'
+
+          const props = withDefaults(defineProps<{
+            categories: CategoryItem[]
+            initialData?: Partial<PublicationItem> | null
+            submitText?: string
+            submitLoadingText?: string
+          }>(), {
+            initialData: null,
+            submitText: 'Зберегти',
+            submitLoadingText: 'Збереження...'
+          })
+
+          const emit = defineEmits<{
+            submit: [payload: Omit<PublicationItem, 'id'>]
+            cancel: []
+          }>()
+
+          const { uploadCover, uploadBook } = useStorageUpload()
+
+          const form = reactive<Omit<PublicationItem, 'id'>>({
+            title: props.initialData?.title || '',
+            author: props.initialData?.author || '',
+            description: props.initialData?.description || '',
+            categoryId: props.initialData?.categoryId || '',
+            coverImage: props.initialData?.coverImage || '',
+            bookFileUrl: props.initialData?.bookFileUrl || '',
+            bookFileName: props.initialData?.bookFileName || '',
+            downloadsCount: Number(props.initialData?.downloadsCount || 0),
+            ratingAverage: Number(props.initialData?.ratingAverage || 0),
+            ratingsCount: Number(props.initialData?.ratingsCount || 0),
+            createdAt: props.initialData?.createdAt || null
+          })
+
+          const loading = ref(false)
+          const errorMessage = ref('')
+
+          const selectedCoverFile = ref<File | null>(null)
+          const selectedCoverName = ref('')
+          const isUploadingCover = ref(false)
+          const coverUploadMessage = ref('')
+          const coverUploadError = ref('')
+
+          const selectedBookFile = ref<File | null>(null)
+          const selectedBookName = ref('')
+          const isUploadingBook = ref(false)
+          const bookUploadMessage = ref('')
+          const bookUploadError = ref('')
+
+          watch(
+            () => props.initialData,
+            (value) => {
+              form.title = value?.title || ''
+              form.author = value?.author || ''
+              form.description = value?.description || ''
+              form.categoryId = value?.categoryId || ''
+              form.coverImage = value?.coverImage || ''
+              form.bookFileUrl = value?.bookFileUrl || ''
+              form.bookFileName = value?.bookFileName || ''
+              form.downloadsCount = Number(value?.downloadsCount || 0)
+              form.ratingAverage = Number(value?.ratingAverage || 0)
+              form.ratingsCount = Number(value?.ratingsCount || 0)
+              form.createdAt = value?.createdAt || null
+            },
+            { deep: true }
+          )
+
+          const handleCoverChange = (event: Event) => {
+            const input = event.target as HTMLInputElement
+            const file = input.files?.[0]
+
+            coverUploadError.value = ''
+            coverUploadMessage.value = ''
+
+            if (!file) return
+
+            selectedCoverFile.value = file
+            selectedCoverName.value = file.name
+          }
+
+          const handleCoverUpload = async () => {
+            coverUploadError.value = ''
+            coverUploadMessage.value = ''
+
+            if (!selectedCoverFile.value) {
+              coverUploadError.value = 'Спочатку оберіть зображення.'
+              return
+            }
+
+            isUploadingCover.value = true
+            coverUploadMessage.value = 'Зображення завантажується...'
+
+            try {
+              form.coverImage = await uploadCover(selectedCoverFile.value)
+              coverUploadMessage.value = 'Обкладинку успішно завантажено.'
+            } catch (error: any) {
+              coverUploadError.value = error?.message || 'Не вдалося завантажити обкладинку.'
+            } finally {
+              isUploadingCover.value = false
+            }
+          }
+
+          const handleBookChange = (event: Event) => {
+            const input = event.target as HTMLInputElement
+            const file = input.files?.[0]
+
+            bookUploadError.value = ''
+            bookUploadMessage.value = ''
+
+            if (!file) return
+
+            if (file.type !== 'application/pdf') {
+              bookUploadError.value = 'Будь ласка, оберіть файл PDF.'
+              return
+            }
+
+            selectedBookFile.value = file
+            selectedBookName.value = file.name
+          }
+
+          const handleBookUpload = async () => {
+            bookUploadError.value = ''
+            bookUploadMessage.value = ''
+
+            if (!selectedBookFile.value) {
+              bookUploadError.value = 'Спочатку оберіть PDF-файл.'
+              return
+            }
+
+            isUploadingBook.value = true
+            bookUploadMessage.value = 'PDF-файл завантажується...'
+
+            try {
+              form.bookFileUrl = await uploadBook(selectedBookFile.value)
+              form.bookFileName = selectedBookFile.value.name
+              bookUploadMessage.value = 'PDF-файл успішно завантажено.'
+            } catch (error: any) {
+              bookUploadError.value = error?.message || 'Не вдалося завантажити PDF-файл.'
+            } finally {
+              isUploadingBook.value = false
+            }
+          }
+
+          const handleSubmit = async () => {
+            errorMessage.value = ''
+
+            if (!form.title.trim()) {
+              errorMessage.value = 'Вкажіть назву книги.'
+              return
+            }
+
+            if (!form.author.trim()) {
+              errorMessage.value = 'Вкажіть автора.'
+              return
+            }
+
+            if (!form.description.trim()) {
+              errorMessage.value = 'Вкажіть короткий опис.'
+              return
+            }
+
+            if (!form.categoryId) {
+              errorMessage.value = 'Оберіть категорію.'
+              return
+            }
+
+            if (!form.coverImage.trim()) {
+              errorMessage.value = 'Завантажте обкладинку книги.'
+              return
+            }
+
+            if (!form.bookFileUrl.trim() || !form.bookFileName.trim()) {
+              errorMessage.value = 'Завантажте PDF-файл книги.'
+              return
+            }
+
+            loading.value = true
+
+            try {
+              emit('submit', {
+                title: form.title.trim(),
+                author: form.author.trim(),
+                description: form.description.trim(),
+                categoryId: form.categoryId,
+                coverImage: form.coverImage.trim(),
+                bookFileUrl: form.bookFileUrl.trim(),
+                bookFileName: form.bookFileName.trim(),
+                downloadsCount: form.downloadsCount || 0,
+                ratingAverage: form.ratingAverage || 0,
+                ratingsCount: form.ratingsCount || 0,
+                createdAt: form.createdAt || null
+              })
+            } finally {
+              setTimeout(() => {
+                loading.value = false
+              }, 300)
+            }
+          }
+          </script>
+          EOF
+
+          cat > pages/admin/publications/create.vue <<'EOF'
+          <template>
+            <section>
+              <div class="mb-6">
+                <h1 class="page-title">Додавання книги</h1>
+                <p class="page-subtitle">Створення нового запису в каталозі інтернет-видавництва.</p>
+              </div>
+
+              <div class="card p-6">
+                <PublicationForm
+                  :categories="categories"
+                  submit-text="Створити книгу"
+                  submit-loading-text="Створення..."
+                  @submit="handleCreate"
+                  @cancel="handleCancel"
+                />
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          import type { PublicationItem } from '~/composables/usePublications'
+
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+
+          const { categories, loadCategories } = useCategories()
+          const { createPublication } = usePublications()
+
+          await loadCategories()
+
+          const handleCreate = async (payload: Omit<PublicationItem, 'id'>) => {
+            try {
+              await createPublication(payload)
+              await navigateTo('/admin/publications')
+            } catch (error) {
+              console.error(error)
+              alert('Не вдалося створити книгу.')
+            }
+          }
+
+          const handleCancel = async () => {
+            await navigateTo('/admin/publications')
+          }
+          </script>
+          EOF
+
+          cat > pages/admin/publications/[id]/edit.vue <<'EOF'
+          <template>
+            <section>
+              <div class="mb-6">
+                <h1 class="page-title">Редагування книги</h1>
+                <p class="page-subtitle">Оновлення даних електронної книги.</p>
+              </div>
+
+              <div v-if="publication" class="card p-6">
+                <PublicationForm
+                  :categories="categories"
+                  :initial-data="publication"
+                  submit-text="Зберегти зміни"
+                  submit-loading-text="Збереження..."
+                  @submit="handleUpdate"
+                  @cancel="handleCancel"
+                />
+              </div>
+
+              <div v-else class="card p-8 text-center text-slate-500">
+                Книгу не знайдено.
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          import type { PublicationItem } from '~/composables/usePublications'
+
+          definePageMeta({
+            layout: 'admin',
+            middleware: 'admin'
+          })
+
+          const route = useRoute()
+          const { categories, loadCategories } = useCategories()
+          const { currentPublication, loadPublications, loadPublicationById, updatePublication } = usePublications()
+
+          await loadCategories()
+          await loadPublications()
+          await loadPublicationById(String(route.params.id))
+
+          const publication = computed(() => currentPublication.value)
+
+          const handleUpdate = async (payload: Omit<PublicationItem, 'id'>) => {
+            try {
+              await updatePublication(String(route.params.id), payload)
+              await navigateTo('/admin/publications')
+            } catch (error) {
+              console.error(error)
+              alert('Не вдалося оновити книгу.')
+            }
+          }
+
+          const handleCancel = async () => {
+            await navigateTo('/admin/publications')
+          }
+          </script>
+          EOF
+
+          cat > pages/publications/[id].vue <<'EOF'
+          <template>
+            <section v-if="publication" class="space-y-6">
+              <div class="card overflow-hidden">
+                <div class="aspect-[21/8] bg-slate-200">
+                  <img
+                    v-if="publication.coverImage"
+                    :src="publication.coverImage"
+                    :alt="publication.title"
+                    class="h-full w-full object-cover"
+                  >
+                  <div v-else class="flex h-full items-center justify-center text-sm text-slate-500">
+                    Без обкладинки
+                  </div>
+                </div>
+
+                <div class="p-6">
+                  <p class="mb-2 text-sm uppercase tracking-wide text-slate-500">
+                    {{ publication.author }}
+                  </p>
+
+                  <h1 class="page-title">{{ publication.title }}</h1>
+
+                  <p class="mt-3 text-base leading-7 text-slate-600">
+                    {{ publication.description }}
+                  </p>
+
+                  <div class="mt-6 grid gap-4 sm:grid-cols-3">
+                    <div class="rounded-2xl bg-slate-50 p-4">
+                      <p class="text-sm text-slate-500">Кількість завантажень</p>
+                      <p class="mt-1 text-2xl font-bold text-slate-900">
+                        {{ publication.downloadsCount || 0 }}
+                      </p>
+                    </div>
+
+                    <div class="rounded-2xl bg-slate-50 p-4">
+                      <p class="text-sm text-slate-500">Середній рейтинг</p>
+                      <p class="mt-1 text-2xl font-bold text-slate-900">
+                        {{ formatAverageRating(publication.ratingAverage) }}
+                      </p>
+                    </div>
+
+                    <div class="rounded-2xl bg-slate-50 p-4">
+                      <p class="text-sm text-slate-500">Кількість оцінок</p>
+                      <p class="mt-1 text-2xl font-bold text-slate-900">
+                        {{ publication.ratingsCount || 0 }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="mt-6 flex flex-wrap gap-3">
+                    <button
+                      class="btn-primary"
+                      :disabled="isDownloading"
+                      @click="handleDownload"
+                    >
+                      {{ isDownloading ? 'Підготовка...' : 'Завантажити книгу' }}
+                    </button>
+
+                    <p v-if="downloadMessage" class="self-center text-sm text-slate-600">
+                      {{ downloadMessage }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section v-else class="card p-8 text-center text-slate-500">
+              Книгу не знайдено.
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          definePageMeta({
+            middleware: []
+          })
+
+          const route = useRoute()
+          const { user, initAuth } = useAuth()
+          const { currentPublication, loadPublications, loadPublicationById } = usePublications()
+          const { recordDownload } = useUserBooks()
+
+          const isDownloading = ref(false)
+          const downloadMessage = ref('')
+
+          if (process.client) {
+            initAuth()
+          }
+
+          await loadPublications()
+          await loadPublicationById(String(route.params.id))
+
+          const publication = computed(() => currentPublication.value)
+
+          const formatAverageRating = (value: number) => {
+            if (!value) return 'Немає оцінок'
+            return value.toFixed(2)
+          }
+
+          const handleDownload = async () => {
+            if (!publication.value) return
+
+            if (!user.value) {
+              await navigateTo('/register')
+              return
+            }
+
+            if (!publication.value.bookFileUrl) {
+              downloadMessage.value = 'Файл книги ще не завантажено.'
+              return
+            }
+
+            isDownloading.value = true
+            downloadMessage.value = ''
+
+            try {
+              await recordDownload(user.value.uid, publication.value.id)
+              window.open(publication.value.bookFileUrl, '_blank')
+
+              await loadPublicationById(publication.value.id)
+              downloadMessage.value = 'Завантаження книги розпочато.'
+            } catch (error) {
+              console.error(error)
+              downloadMessage.value = 'Не вдалося розпочати завантаження книги.'
+            } finally {
+              isDownloading.value = false
+            }
+          }
+          </script>
+          EOF
+
+          cat > pages/profile.vue <<'EOF'
+          <template>
+            <section class="space-y-6">
+              <div class="card p-6">
+                <h1 class="page-title">Профіль користувача</h1>
+                <p class="page-subtitle">Персональні дані та перелік завантажених книг.</p>
+
+                <div v-if="user" class="mt-6 grid gap-4 sm:grid-cols-3">
+                  <div class="rounded-2xl bg-slate-50 p-4">
+                    <p class="text-sm text-slate-500">Ім’я</p>
+                    <p class="mt-1 font-medium text-slate-900">{{ user.name || 'Не вказано' }}</p>
+                  </div>
+
+                  <div class="rounded-2xl bg-slate-50 p-4">
+                    <p class="text-sm text-slate-500">Email</p>
+                    <p class="mt-1 font-medium text-slate-900">{{ user.email }}</p>
+                  </div>
+
+                  <div class="rounded-2xl bg-slate-50 p-4">
+                    <p class="text-sm text-slate-500">Роль</p>
+                    <p class="mt-1 font-medium text-slate-900">{{ user.role === 'admin' ? 'Адміністратор' : 'Користувач' }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card p-6">
+                <div class="mb-6">
+                  <h2 class="text-2xl font-semibold text-slate-900">Завантажені книги</h2>
+                  <p class="mt-2 text-sm text-slate-600">
+                    Тут відображаються книги, які ви вже завантажили, та можливість виставити рейтинг.
+                  </p>
+                </div>
+
+                <div v-if="profileBooks.length" class="space-y-4">
+                  <div
+                    v-for="item in profileBooks"
+                    :key="item.record.id"
+                    class="rounded-2xl border border-slate-200 p-4"
+                  >
+                    <div class="grid gap-4 md:grid-cols-[90px_minmax(0,1fr)_220px] md:items-start">
+                      <div class="h-28 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
+                        <img
+                          v-if="item.publication?.coverImage"
+                          :src="item.publication.coverImage"
+                          :alt="item.publication.title"
+                          class="h-full w-full object-cover"
+                        >
+                        <div v-else class="flex h-full items-center justify-center text-xs text-slate-400">
+                          Без обкладинки
+                        </div>
+                      </div>
+
+                      <div class="min-w-0">
+                        <h3 class="text-lg font-semibold text-slate-900">
+                          {{ item.publication?.title || 'Книгу не знайдено' }}
+                        </h3>
+
+                        <p class="mt-1 text-sm text-slate-600">
+                          {{ item.publication?.author || 'Автор не вказаний' }}
+                        </p>
+
+                        <p class="mt-3 text-sm text-slate-500">
+                          Дата завантаження:
+                          <span class="font-medium text-slate-700">
+                            {{ formatDate(item.record.downloadedAt) }}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div>
+                        <label class="label" :for="`rating-${item.record.id}`">Мій рейтинг</label>
+
+                        <select
+                          :id="`rating-${item.record.id}`"
+                          class="input"
+                          :value="item.record.rating ?? ''"
+                          @change="handleRatingChange(item.record.publicationId, $event)"
+                        >
+                          <option value="">Оберіть оцінку</option>
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4">4</option>
+                          <option value="5">5</option>
+                        </select>
+
+                        <p class="mt-2 text-xs text-slate-500">
+                          Оцінювати можна лише книги, які ви вже завантажили.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else class="rounded-2xl bg-slate-50 p-8 text-center text-slate-500">
+                  Ви ще не завантажували жодної книги.
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <script setup lang="ts">
+          definePageMeta({
+            middleware: 'auth'
+          })
+
+          const { user, initAuth } = useAuth()
+          const { publications, loadPublications } = usePublications()
+          const { userBooks, loadUserBooks, setRating } = useUserBooks()
+
+          if (process.client) {
+            initAuth()
+          }
+
+          await loadPublications()
+
+          if (user.value?.uid) {
+            await loadUserBooks(user.value.uid)
+          }
+
+          watch(
+            () => user.value?.uid,
+            async (uid) => {
+              if (uid) {
+                await loadUserBooks(uid)
+              }
+            },
+            { immediate: false }
+          )
+
+          const profileBooks = computed(() => {
+            return userBooks.value.map((record) => ({
+              record,
+              publication: publications.value.find((item) => item.id === record.publicationId) || null
+            }))
+          })
+
+          const formatDate = (value: any) => {
+            if (!value) return '—'
+
+            try {
+              if (typeof value?.toDate === 'function') {
+                return new Intl.DateTimeFormat('uk-UA', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }).format(value.toDate())
+              }
+
+              return new Intl.DateTimeFormat('uk-UA', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              }).format(new Date(value))
+            } catch {
+              return '—'
+            }
+          }
+
+          const handleRatingChange = async (publicationId: string, event: Event) => {
+            if (!user.value?.uid) return
+
+            const target = event.target as HTMLSelectElement
+            const value = Number(target.value)
+
+            if (!value || value < 1 || value > 5) return
+
+            try {
+              await setRating(user.value.uid, publicationId, value)
+              await loadPublications()
+            } catch (error) {
+              console.error(error)
+              alert('Не вдалося зберегти рейтинг.')
+            }
+          }
+          </script>
+          EOF
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
+
+      - name: Commit and push changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .
+          git diff --cached --quiet || git commit -m "TASK007: add downloads tracking, ratings and profile history"
+          git push
