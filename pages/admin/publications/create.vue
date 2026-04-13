@@ -1,14 +1,14 @@
 <template>
   <section>
     <div class="mb-6">
-      <h1 class="page-title">Додавання публікації</h1>
+      <h1 class="page-title">Додавання книги</h1>
       <p class="page-subtitle">Створення нового запису в каталозі інтернет-видавництва.</p>
     </div>
 
     <div class="card p-6">
       <PublicationForm
         :categories="categories"
-        submit-text="Створити публікацію"
+        submit-text="Створити книгу"
         submit-loading-text="Створення..."
         @submit="handleCreate"
         @cancel="handleCancel"
@@ -36,7 +36,7 @@ const handleCreate = async (payload: Omit<PublicationItem, 'id'>) => {
     await navigateTo('/admin/publications')
   } catch (error) {
     console.error(error)
-    alert('Не вдалося створити публікацію.')
+    alert('Не вдалося створити книгу.')
   }
 }
 

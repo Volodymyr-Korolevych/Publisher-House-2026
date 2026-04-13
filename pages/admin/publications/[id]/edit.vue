@@ -1,8 +1,8 @@
 <template>
   <section>
     <div class="mb-6">
-      <h1 class="page-title">Редагування публікації</h1>
-      <p class="page-subtitle">Оновлення даних електронної публікації.</p>
+      <h1 class="page-title">Редагування книги</h1>
+      <p class="page-subtitle">Оновлення даних електронної книги.</p>
     </div>
 
     <div v-if="publication" class="card p-6">
@@ -17,7 +17,7 @@
     </div>
 
     <div v-else class="card p-8 text-center text-slate-500">
-      Публікацію не знайдено.
+      Книгу не знайдено.
     </div>
   </section>
 </template>
@@ -46,7 +46,7 @@ const handleUpdate = async (payload: Omit<PublicationItem, 'id'>) => {
     await navigateTo('/admin/publications')
   } catch (error) {
     console.error(error)
-    alert('Не вдалося оновити публікацію.')
+    alert('Не вдалося оновити книгу.')
   }
 }
 
