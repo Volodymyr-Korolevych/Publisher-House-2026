@@ -1,30 +1,17 @@
-import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 
 export const useStorageUpload = () => {
   const { $storage } = useNuxtApp()
 
-  const uploadPublicationCover = async (file: File) => {
-    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
-    const safeBaseName = file.name
-      .replace(/\.[^/.]+$/, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9а-яіїєґ_-]+/gi, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-
-    const fileName = `${Date.now()}-${safeBaseName || 'cover'}.${extension || 'jpg'}`
-    const fileRef = storageRef($storage, `publication-covers/${fileName}`)
-
+  const uploadFile = async (file: File, folder: string) => {
+    const fileRef = ref($storage, `${folder}/${Date.now()}-${file.name}`)
     await uploadBytes(fileRef, file)
-    const downloadURL = await getDownloadURL(fileRef)
-
-    return {
-      path: fileRef.fullPath,
-      url: downloadURL
-    }
+    const url = await getDownloadURL(fileRef)
+    return url
   }
 
   return {
-    uploadPublicationCover
+    uploadCover: (file: File) => uploadFile(file, 'covers'),
+    uploadBook: (file: File) => uploadFile(file, 'books')
   }
 }
