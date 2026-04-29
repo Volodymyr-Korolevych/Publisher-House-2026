@@ -14,12 +14,7 @@
 
     <div>
       <label class="label" for="description">Короткий опис</label>
-      <textarea
-        id="description"
-        v-model="form.description"
-        class="input min-h-[110px]"
-        required
-      />
+      <textarea id="description" v-model="form.description" class="input min-h-[110px]" required />
     </div>
 
     <div>
@@ -38,12 +33,8 @@
       <div class="flex flex-col gap-3 md:flex-row md:items-center">
         <label class="btn-secondary cursor-pointer">
           Оберіть зображення
-          <input
-            class="hidden"
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/jpg"
-            @change="handleCoverChange"
-          >
+          <input class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/jpg"
+            @change="handleCoverChange">
         </label>
 
         <span class="text-sm text-slate-600">
@@ -52,12 +43,8 @@
       </div>
 
       <div class="flex flex-wrap gap-3">
-        <button
-          type="button"
-          class="btn-primary"
-          :disabled="!selectedCoverFile || isUploadingCover"
-          @click="handleCoverUpload"
-        >
+        <button type="button" class="btn-primary" :disabled="!selectedCoverFile || isUploadingCover"
+          @click="handleCoverUpload">
           {{ isUploadingCover ? 'Завантаження...' : 'Завантажити обкладинку' }}
         </button>
       </div>
@@ -70,12 +57,11 @@
         {{ coverUploadError }}
       </p>
 
-      <div v-if="form.coverImage" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <img
-          :src="form.coverImage"
-          alt="Попередній перегляд обкладинки"
-          class="h-56 w-full object-cover"
-        >
+      <div v-if="form.coverImage"
+        class="w-full max-w-[220px] overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div class="aspect-[2/3]">
+          <img :src="form.coverImage" alt="Попередній перегляд обкладинки" class="h-full w-full object-cover">
+        </div>
       </div>
     </div>
 
@@ -85,12 +71,7 @@
       <div class="flex flex-col gap-3 md:flex-row md:items-center">
         <label class="btn-secondary cursor-pointer">
           Оберіть PDF-файл
-          <input
-            class="hidden"
-            type="file"
-            accept="application/pdf"
-            @change="handleBookChange"
-          >
+          <input class="hidden" type="file" accept="application/pdf" @change="handleBookChange">
         </label>
 
         <span class="text-sm text-slate-600">
@@ -99,12 +80,8 @@
       </div>
 
       <div class="flex flex-wrap gap-3">
-        <button
-          type="button"
-          class="btn-primary"
-          :disabled="!selectedBookFile || isUploadingBook"
-          @click="handleBookUpload"
-        >
+        <button type="button" class="btn-primary" :disabled="!selectedBookFile || isUploadingBook"
+          @click="handleBookUpload">
           {{ isUploadingBook ? 'Завантаження...' : 'Завантажити PDF' }}
         </button>
       </div>

@@ -1,14 +1,12 @@
 <template>
   <article class="card overflow-hidden">
-    <div class="aspect-[16/9] bg-slate-200">
-      <img
-        v-if="publication.coverImage"
-        :src="publication.coverImage"
-        :alt="publication.title"
-        class="h-full w-full object-cover"
-      >
-      <div v-else class="flex h-full items-center justify-center text-sm text-slate-500">
-        Без обкладинки
+    <div class="bg-slate-200 p-4">
+      <div class="mx-auto aspect-[2/3] w-full max-w-[220px] overflow-hidden rounded-xl bg-slate-100">
+        <img v-if="publication.coverImage" :src="publication.coverImage" :alt="publication.title"
+          class="h-full w-full object-cover">
+        <div v-else class="flex h-full items-center justify-center text-sm text-slate-500">
+          Без обкладинки
+        </div>
       </div>
     </div>
 
