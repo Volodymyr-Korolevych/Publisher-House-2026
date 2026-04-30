@@ -69,10 +69,34 @@ export const useAuth = () => {
     return credentials.user
   }
 
-  const login = async (payload: { email: string; password: string }) => {
-    const credentials = await signInWithEmailAndPassword($auth, payload.email, payload.password)
-    return credentials.user
+const login = async (payload: { email: string; password: string }) => {
+  const credentials = await signInWithEmailAndPassword($auth, payload.email, payload.password)
+
+  const userRef = doc($db, 'users', credentials.user.uid)
+  const userSnap = await getDoc(userRef)
+
+  if (userSnap.exists()) {
+    const data = userSnap.data()
+
+    user.value = {
+      uid: credentials.user.uid,
+      name: String(data.name || ''),
+      email: String(data.email || credentials.user.email || ''),
+      role: (data.role as UserRole) || 'user'
+    }
+  } else {
+    user.value = {
+      uid: credentials.user.uid,
+      name: credentials.user.displayName || '',
+      email: credentials.user.email || '',
+      role: 'user'
+    }
   }
+
+  isReady.value = true
+
+  return credentials.user
+}
 
   const logout = async () => {
     await signOut($auth)
