@@ -65,6 +65,12 @@ export const useAuth = () => {
       role: 'user',
       createdAt: serverTimestamp()
     })
+    user.value = {
+      uid: credentials.user.uid,
+      name: payload.name,
+      email: payload.email,
+      role: 'user',
+    }
 
     return credentials.user
   }
