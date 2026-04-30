@@ -1,7 +1,7 @@
 <template>
   <section class="space-y-6">
     <div class="card p-6">
-      <h1 class="page-title">Профіль користувача</h1>
+      <h1 class="page-title">Кабінет користувача</h1>
       <p class="page-subtitle">Персональні дані та перелік завантажених книг.</p>
 
       <div v-if="user" class="mt-6 grid gap-4 sm:grid-cols-3">

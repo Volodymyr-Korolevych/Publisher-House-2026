@@ -15,6 +15,10 @@
         {{ publication.author || 'Невідомий автор' }}
       </p>
 
+      <p v-if="categoryName" class="mb-2 text-xs font-medium text-slate-500">
+        {{ categoryName }}
+      </p>
+
       <h3 class="mb-2 text-xl font-semibold text-slate-900">
         {{ publication.title }}
       </h3>
@@ -31,13 +35,22 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   publication: {
     id: string
     title: string
     author?: string
     description?: string
     coverImage?: string
+    categoryId?: string
   }
 }>()
+
+const { categories, loadCategories } = useCategories()
+
+await loadCategories()
+
+const categoryName = computed(() => {
+  return categories.value.find((category) => category.id === props.publication.categoryId)?.name || ''
+})
 </script>

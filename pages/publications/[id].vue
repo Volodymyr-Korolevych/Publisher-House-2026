@@ -4,12 +4,8 @@
       <div class="grid gap-6 p-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <div class="mx-auto w-full max-w-[260px]">
           <div class="aspect-[2/3] overflow-hidden rounded-2xl bg-slate-200 shadow-sm ring-1 ring-slate-200">
-            <img
-              v-if="publication.coverImage"
-              :src="publication.coverImage"
-              :alt="publication.title"
-              class="h-full w-full object-cover"
-            >
+            <img v-if="publication.coverImage" :src="publication.coverImage" :alt="publication.title"
+              class="h-full w-full object-cover">
             <div v-else class="flex h-full items-center justify-center text-sm text-slate-500">
               Без обкладинки
             </div>
@@ -21,12 +17,15 @@
             {{ publication.author }}
           </p>
 
+          <p v-if="categoryName" class="mb-3 text-sm font-medium text-slate-500">
+            {{ categoryName }}
+          </p>
+
           <h1 class="page-title">{{ publication.title }}</h1>
 
           <div
             class="mt-3 space-y-3 text-base leading-7 text-slate-600 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-slate-900 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-slate-900 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-            v-html="descriptionHtml"
-          />
+            v-html="descriptionHtml" />
 
           <div class="mt-6 grid gap-4 sm:grid-cols-3">
             <div class="rounded-2xl bg-slate-50 p-4">
@@ -52,11 +51,7 @@
           </div>
 
           <div class="mt-6 flex flex-wrap gap-3">
-            <button
-              class="btn-primary"
-              :disabled="isDownloading"
-              @click="handleDownload"
-            >
+            <button class="btn-primary" :disabled="isDownloading" @click="handleDownload">
               {{ isDownloading ? 'Підготовка...' : 'Завантажити книгу' }}
             </button>
 
@@ -83,6 +78,7 @@ const route = useRoute()
 const { user, initAuth } = useAuth()
 const { currentPublication, loadPublications, loadPublicationById } = usePublications()
 const { recordDownload } = useUserBooks()
+const { categories, loadCategories } = useCategories()
 
 const isDownloading = ref(false)
 const downloadMessage = ref('')
@@ -92,9 +88,14 @@ if (process.client) {
 }
 
 await loadPublications()
+await loadCategories()
 await loadPublicationById(String(route.params.id))
 
 const publication = computed(() => currentPublication.value)
+
+const categoryName = computed(() => {
+  return categories.value.find(item => item.id === publication.value?.categoryId)?.name || ''
+})
 
 const escapeHtml = (value: string) => {
   return value
