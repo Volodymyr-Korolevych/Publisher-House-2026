@@ -5,7 +5,7 @@
       <p class="page-subtitle">Створення, редагування та видалення тематичних категорій.</p>
     </div>
 
-    <div class="card p-6">
+    <div ref="formCard" class="card p-6">
       <h2 class="text-xl font-semibold text-slate-900">
         {{ editingId ? 'Редагування категорії' : 'Додавання категорії' }}
       </h2>
@@ -18,12 +18,7 @@
 
         <div>
           <label class="label" for="description">Опис категорії</label>
-          <textarea
-            id="description"
-            v-model="form.description"
-            class="input min-h-[110px]"
-            required
-          />
+          <textarea id="description" v-model="form.description" class="input min-h-[110px]" required />
         </div>
 
         <div class="flex flex-wrap gap-3">
@@ -31,12 +26,7 @@
             {{ editingId ? 'Зберегти зміни' : 'Додати категорію' }}
           </button>
 
-          <button
-            v-if="editingId"
-            type="button"
-            class="btn-secondary"
-            @click="resetForm"
-          >
+          <button v-if="editingId" type="button" class="btn-secondary" @click="resetForm">
             Скасувати редагування
           </button>
         </div>
@@ -44,11 +34,7 @@
     </div>
 
     <div v-if="categories.length" class="grid gap-4">
-      <div
-        v-for="item in categories"
-        :key="item.id"
-        class="card p-5"
-      >
+      <div v-for="item in categories" :key="item.id" class="card p-5">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 class="text-lg font-semibold text-slate-900">{{ item.name }}</h2>
@@ -83,6 +69,7 @@ definePageMeta({
 const { categories, loadCategories, createCategory, updateCategory, removeCategory } = useCategories()
 
 const editingId = ref<string | null>(null)
+const formCard = ref<HTMLElement | null>(null)
 
 const form = reactive({
   name: '',
@@ -97,13 +84,20 @@ const resetForm = () => {
   form.description = ''
 }
 
-const startEdit = (id: string) => {
+const startEdit = async (id: string) => {
   const category = categories.value.find(item => item.id === id)
   if (!category) return
 
   editingId.value = id
   form.name = category.name
   form.description = category.description
+
+  await nextTick()
+
+  formCard.value?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  })
 }
 
 const handleSubmit = async () => {

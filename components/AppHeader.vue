@@ -1,5 +1,5 @@
 <template>
-  <header class="border-b border-slate-200 bg-white/90 backdrop-blur">
+  <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
     <div class="container-app flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between">
       <div class="flex items-center justify-between gap-4">
         <NuxtLink to="/" class="text-xl font-bold tracking-tight text-slate-900">
@@ -20,8 +20,8 @@
           </NuxtLink>
 
           <div v-if="categories.length"
-            class="mt-2 flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg md:absolute md:left-0 md:top-full md:z-20 md:mt-0 md:hidden md:min-w-[240px] md:group-hover:flex"
-           > <NuxtLink to="/publications"
+            class="mt-2 flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg md:absolute md:left-0 md:top-full md:z-20 md:mt-0 md:hidden md:min-w-[240px] md:group-hover:flex">
+            <NuxtLink to="/publications"
               class="rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900">
               Усі публікації
             </NuxtLink>

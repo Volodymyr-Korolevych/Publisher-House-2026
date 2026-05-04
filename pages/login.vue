@@ -4,15 +4,16 @@
       <h1 class="page-title">Вхід</h1>
       <p class="page-subtitle">Увійдіть до системи, використовуючи електронну пошту та пароль.</p>
 
-      <form class="mt-6 space-y-4" @submit.prevent="handleLogin">
+      <form class="mt-6 space-y-4" autocomplete="off" @submit.prevent="handleLogin">
         <div>
           <label class="label" for="email">Email</label>
-          <input id="email" v-model="form.email" type="email" class="input" required>
+          <input id="email" v-model="form.email" type="email" class="input" autocomplete="off" required>
         </div>
 
         <div>
           <label class="label" for="password">Пароль</label>
-          <input id="password" v-model="form.password" type="password" class="input" required>
+          <input id="password" v-model="form.password" type="password" class="input" autocomplete="new-password"
+            required>
         </div>
 
         <p v-if="errorMessage" class="text-sm text-red-600">
@@ -28,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-const { login } = useAuth()
+const { user, login } = useAuth()
 
 const form = reactive({
   email: '',
@@ -37,6 +38,12 @@ const form = reactive({
 
 const loading = ref(false)
 const errorMessage = ref('')
+
+onMounted(() => {
+  form.email = ''
+  form.password = ''
+  errorMessage.value = ''
+})
 
 const handleLogin = async () => {
   errorMessage.value = ''
@@ -48,7 +55,11 @@ const handleLogin = async () => {
       password: form.password
     })
 
-    await navigateTo('/profile')
+    if (user.value?.role === 'admin') {
+      await navigateTo('/admin')
+    } else {
+      await navigateTo('/profile')
+    }
   } catch (error: any) {
     errorMessage.value = error?.message || 'Не вдалося виконати вхід.'
   } finally {

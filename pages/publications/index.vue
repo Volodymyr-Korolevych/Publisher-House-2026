@@ -12,7 +12,7 @@
       <input id="search" v-model="search" type="text" class="input" placeholder="Введіть назву або автора">
     </div>
 
-    <div v-if="filteredPublications.length" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <div v-if="filteredPublications.length" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       <PublicationCard v-for="publication in filteredPublications" :key="publication.id" :publication="publication" />
     </div>
 
