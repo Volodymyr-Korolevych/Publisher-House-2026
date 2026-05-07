@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #__nuxt {
+html,
+body,
+#__nuxt {
   min-height: 100%;
 }
 
@@ -23,15 +25,15 @@ body {
 }
 
 .btn-primary {
-  @apply btn bg-slate-900 text-white hover:bg-slate-800;
+  @apply btn bg-primary text-white hover:bg-primaryHover;
 }
 
 .btn-secondary {
-  @apply btn bg-white text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100;
+  @apply btn bg-white text-slate-900 ring-1 ring-slate-300 hover:bg-slate-100 hover:text-primary;
 }
 
 .input {
-  @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-2 outline-none transition focus:border-slate-500;
+  @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-2 outline-none transition focus:border-primary focus:ring-1 focus:ring-primary;
 }
 
 .label {
@@ -39,7 +41,7 @@ body {
 }
 
 .page-title {
-  @apply text-3xl font-bold tracking-tight text-slate-900;
+  @apply relative text-3xl font-bold tracking-tight text-slate-900 after:mt-3 after:block after:h-[2px] after:w-12 after:bg-primary;
 }
 
 .page-subtitle {

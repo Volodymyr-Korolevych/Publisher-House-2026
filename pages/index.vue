@@ -1,34 +1,20 @@
 <template>
   <div class="space-y-10">
-    <section class="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-      <div>
-
-        <p class="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
-          Літера &mdash; це платформа для перегляду каталогу електронних публікацій, пошуку книг та завантаження обраної
-          книги
-        </p>
-        <div class="mt-6 flex flex-wrap gap-3">
-          <NuxtLink to="/publications" class="btn-primary">Перейти до каталогу</NuxtLink>
-          <NuxtLink to="/register" class="btn-secondary">Створити обліковий запис</NuxtLink>
-        </div>
-      </div>
-
-      <div class="card p-6">
-        <h2 class="mb-4 text-xl font-semibold text-slate-900">Основні можливості</h2>
-        <ul class="space-y-3 text-sm text-slate-600">
-          <li>• каталог публікацій</li>
-          <li>• пошук і перегляд матеріалів</li>
-          <li>• реєстрація та авторизація</li>
-          <li>• ролі користувачів</li>
-          <li>• адміністративна частина</li>
-          <li>• CRUD для публікацій і категорій</li>
-        </ul>
+    <section class="max-w-3xl border-l-4 border-primary pl-6 pt-2">
+      <p class="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
+        Літера &mdash; це платформа для перегляду каталогу електронних публікацій, пошуку книг та завантаження обраної
+        книги
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <NuxtLink to="/publications" class="btn-primary">Перейти до каталогу</NuxtLink>
+        <NuxtLink to="/register" class="btn-secondary">Створити обліковий запис</NuxtLink>
       </div>
     </section>
 
     <section class="space-y-8">
       <div>
-        <h2 class="text-2xl font-bold tracking-tight text-slate-900">
+        <h2
+          class="relative text-2xl font-bold tracking-tight text-slate-900 after:mt-3 after:block after:h-[2px] after:w-12 after:bg-primary">
           Книги за категоріями
         </h2>
         <p class="mt-2 text-sm text-slate-600">

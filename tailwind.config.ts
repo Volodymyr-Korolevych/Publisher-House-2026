@@ -13,6 +13,8 @@ export default {
   theme: {
     extend: {
       colors: {
+        primary: '#5a1e2c',
+        primaryHover: '#431520',
         brand: {
           50: '#f5f8ff',
           100: '#eaf0ff',

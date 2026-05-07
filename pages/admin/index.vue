@@ -1,7 +1,7 @@
 <template>
   <div>
     <h1 class="page-title">Адміністративна панель</h1>
-    <p class="page-subtitle">Керування основними розділами WEB-застосунку.</p>
+    <p class="page-subtitle">Керування основними розділами WEB-сайту</p>
 
     <div class="mt-6 grid gap-6 md:grid-cols-3">
       <div class="card p-5">

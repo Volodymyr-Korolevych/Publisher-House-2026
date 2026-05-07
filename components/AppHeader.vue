@@ -2,7 +2,7 @@
   <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
     <div class="container-app flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between">
       <div class="flex items-center justify-between gap-4">
-        <NuxtLink to="/" class="text-xl font-bold tracking-tight text-slate-900">
+        <NuxtLink to="/" class="text-2xl font-bold tracking-tight text-slate-900 hover:text-primary">
           Інтернет-видавництво Літера
         </NuxtLink>
 
@@ -12,37 +12,41 @@
       </div>
 
       <nav :class="['flex-col gap-3 md:flex md:flex-row md:items-center', isOpen ? 'flex' : 'hidden']">
-        <NuxtLink to="/" class="text-sm text-slate-700 hover:text-slate-900">Головна</NuxtLink>
+        <NuxtLink to="/" class="text-sm text-slate-700 hover:text-primary hover:underline hover:underline-offset-4">
+          Головна</NuxtLink>
 
         <div class="group relative">
-          <NuxtLink to="/publications" class="text-sm text-slate-700 hover:text-slate-900">
+          <NuxtLink to="/publications"
+            class="text-sm text-slate-700 hover:text-primary hover:underline hover:underline-offset-4">
             Публікації
           </NuxtLink>
 
           <div v-if="categories.length"
             class="mt-2 flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg md:absolute md:left-0 md:top-full md:z-20 md:mt-0 md:hidden md:min-w-[240px] md:group-hover:flex">
             <NuxtLink to="/publications"
-              class="rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+              class="rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-primary">
               Усі публікації
             </NuxtLink>
 
             <NuxtLink v-for="category in categories" :key="category.id" :to="`/publications?category=${category.id}`"
-              class="rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+              class="rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-primary">
               {{ category.name }}
             </NuxtLink>
           </div>
         </div>
 
         <NuxtLink v-if="isLoggedIn && user?.role === 'user'" to="/profile"
-          class="text-sm text-slate-700 hover:text-slate-900">
+          class="text-sm text-slate-700 hover:text-primary hover:underline hover:underline-offset-4">
           Кабінет
         </NuxtLink>
 
-        <NuxtLink v-if="isAdmin" to="/admin" class="text-sm text-slate-700 hover:text-slate-900">
+        <NuxtLink v-if="isAdmin" to="/admin"
+          class="text-sm text-slate-700 hover:text-primary hover:underline hover:underline-offset-4">
           Адмін-панель
         </NuxtLink>
 
-        <NuxtLink v-if="!isLoggedIn" to="/login" class="btn-secondary">
+        <NuxtLink v-if="!isLoggedIn" to="/login"
+          class="text-sm text-slate-700 hover:text-primary hover:underline hover:underline-offset-4">
           Вхід
         </NuxtLink>
 
