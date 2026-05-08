@@ -38,7 +38,7 @@
           </NuxtLink>
         </div>
 
-        <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div class="grid gap-6 grid-cols-3">
           <PublicationCard v-for="publication in category.publications" :key="publication.id"
             :publication="publication" />
         </div>

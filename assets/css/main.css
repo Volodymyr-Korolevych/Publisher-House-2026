@@ -7,6 +7,15 @@ body,
 #__nuxt {
   min-height: 100%;
 }
+html,
+body {
+  caret-color: transparent;
+}
+
+input,
+textarea {
+  caret-color: black;
+}
 
 body {
   @apply bg-slate-50 text-slate-900;
