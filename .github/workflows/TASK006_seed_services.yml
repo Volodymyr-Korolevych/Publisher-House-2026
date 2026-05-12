@@ -1,0 +1,331 @@
+name: TASK006_SEED_SERVICES
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  task006:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and replace files for TASK006
+        shell: bash
+        run: |
+          mkdir -p server/data
+          mkdir -p server/api/dev
+          mkdir -p server/models
+          mkdir -p pages
+
+          cat > server/models/Service.ts <<'EOF'
+          import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose'
+
+          const serviceSchema = new Schema(
+            {
+              title: {
+                type: String,
+                required: true,
+                trim: true
+              },
+              category: {
+                type: String,
+                default: '',
+                trim: true
+              },
+              description: {
+                type: String,
+                default: ''
+              },
+              price: {
+                type: Number,
+                required: true,
+                min: 0
+              },
+              duration: {
+                type: Number,
+                required: true,
+                min: 1
+              }
+            },
+            {
+              timestamps: true
+            }
+          )
+
+          export type ServiceDocument = InferSchemaType<typeof serviceSchema>
+
+          export const Service: Model<ServiceDocument> =
+            mongoose.models.Service || mongoose.model<ServiceDocument>('Service', serviceSchema)
+          EOF
+
+          cat > server/data/seedServices.ts <<'EOF'
+          export const seedServices = [
+            { category: 'Стрижки', title: 'Модельна жіноча стрижка з укладкою', description: 'Жіноча модельна стрижка з базовою укладкою.', price: 1200, duration: 90 },
+            { category: 'Стрижки', title: 'Стрижка гарячими ножицями', description: 'Стрижка гарячими ножицями для догляду за кінчиками волосся.', price: 1200, duration: 90 },
+            { category: 'Стрижки', title: 'Преміум догляд Orising', description: 'Преміум доглядова процедура для волосся Orising.', price: 2500, duration: 90 },
+            { category: 'Стрижки', title: 'Відновлення волосся Olaplex', description: 'Процедура відновлення волосся з використанням Olaplex.', price: 2200, duration: 90 },
+            { category: 'Стрижки', title: 'Лікування волосся Kerastase', description: 'Доглядова процедура для покращення стану волосся.', price: 1800, duration: 90 },
+
+            { category: 'Моделювання', title: 'Укладка Loreal', description: 'Професійна укладка волосся з використанням засобів Loreal.', price: 800, duration: 60 },
+            { category: 'Моделювання', title: 'Укладка Kerastase', description: 'Професійна укладка волосся з використанням засобів Kerastase.', price: 1100, duration: 60 },
+            { category: 'Моделювання', title: 'Steam pod вирівнювання', description: 'Вирівнювання волосся з використанням Steam pod.', price: 800, duration: 60 },
+            { category: 'Моделювання', title: 'Накрутка класична', description: 'Класична накрутка волосся.', price: 900, duration: 60 },
+            { category: 'Моделювання', title: 'Голлівудські локони', description: 'Святкова укладка з ефектом голлівудських локонів.', price: 1100, duration: 75 },
+            { category: 'Моделювання', title: 'Зачіска вечірня', description: 'Вечірня зачіска для особливих подій.', price: 1500, duration: 90 },
+            { category: 'Моделювання', title: 'Зачіска весільна', description: 'Весільна зачіска для урочистої події.', price: 2500, duration: 120 },
+
+            { category: 'Фарбування волосся', title: 'Фарбування коренів фарбами Loreal', description: 'Фарбування коренів волосся професійними фарбами Loreal.', price: 2500, duration: 120 },
+            { category: 'Фарбування волосся', title: 'Фарбування з тонуванням', description: 'Фарбування волосся з подальшим тонуванням.', price: 3300, duration: 150 },
+            { category: 'Фарбування волосся', title: 'Висвітлення з тонуванням', description: 'Висвітлення волосся з тонуванням.', price: 4000, duration: 180 },
+            { category: 'Фарбування волосся', title: 'Креативне колорування', description: 'Складне або креативне фарбування волосся.', price: 3500, duration: 180 },
+            { category: 'Фарбування волосся', title: 'Мелірування Air Touch, контуринг', description: 'Складне мелірування волосся у сучасних техніках.', price: 4500, duration: 240 },
+            { category: 'Фарбування волосся', title: 'Біозавивка Mossa', description: 'Біозавивка волосся з використанням засобів Mossa.', price: 3900, duration: 180 },
+            { category: 'Фарбування волосся', title: 'Вихід з темного кольору', description: 'Складна процедура поступового виходу з темного кольору.', price: 7000, duration: 300 },
+
+            { category: 'Відновлення волосся', title: 'Відновлення ботоксом', description: 'Процедура відновлення волосся ботоксом.', price: 2000, duration: 120 },
+            { category: 'Відновлення волосся', title: 'Відновлення Orising, Euphoria, Lanza', description: 'Доглядова процедура для відновлення волосся.', price: 2500, duration: 120 },
+
+            { category: 'Манікюр', title: 'Манікюр гігієнічний комбінований', description: 'Гігієнічний комбінований манікюр.', price: 600, duration: 60 },
+            { category: 'Манікюр', title: 'Парафінотерапія рук', description: 'Доглядова процедура парафінотерапії для рук.', price: 400, duration: 30 },
+            { category: 'Манікюр', title: 'SPA догляд рук', description: 'SPA догляд для рук.', price: 800, duration: 45 },
+
+            { category: 'Педикюр', title: 'Педикюр апаратний', description: 'Апаратний педикюр.', price: 800, duration: 75 },
+            { category: 'Педикюр', title: 'Педикюр медичний', description: 'Медичний педикюр.', price: 950, duration: 90 },
+            { category: 'Педикюр', title: 'SPA догляд ніг', description: 'SPA догляд для ніг.', price: 1000, duration: 60 },
+            { category: 'Педикюр', title: 'Парафінотерапія ніг', description: 'Доглядова процедура парафінотерапії для ніг.', price: 450, duration: 30 },
+            { category: 'Педикюр', title: 'Лікувальні послуги педикюру', description: 'Лікувальні послуги для догляду за стопами.', price: 400, duration: 60 },
+            { category: 'Педикюр', title: 'Віковий педикюр', description: 'Педикюр з урахуванням вікових особливостей.', price: 1400, duration: 90 },
+
+            { category: 'Покриття нігтів', title: 'Лак Vinylux', description: 'Покриття нігтів лаком Vinylux.', price: 300, duration: 30 },
+            { category: 'Покриття нігтів', title: 'Укріплення нігтів', description: 'Процедура укріплення нігтів.', price: 400, duration: 45 },
+            { category: 'Покриття нігтів', title: 'Гель-лак Shellac, Artistic', description: 'Покриття нігтів гель-лаком.', price: 500, duration: 60 },
+            { category: 'Покриття нігтів', title: 'Френч', description: 'Французьке покриття нігтів.', price: 600, duration: 70 },
+            { category: 'Покриття нігтів', title: 'Нарощування гелеве', description: 'Гелеве нарощування нігтів.', price: 1500, duration: 120 },
+            { category: 'Покриття нігтів', title: 'Нарощування гелеве френч', description: 'Гелеве нарощування нігтів з френч-покриттям.', price: 1700, duration: 140 },
+            { category: 'Покриття нігтів', title: 'Корекція гелевих нігтів', description: 'Корекція гелевих нігтів.', price: 1300, duration: 90 },
+            { category: 'Покриття нігтів', title: 'Корекція гелевих нігтів френч', description: 'Корекція гелевих нігтів з френч-покриттям.', price: 1500, duration: 100 },
+
+            { category: 'Чоловічі послуги', title: 'Стрижка під машинку', description: 'Чоловіча стрижка під машинку.', price: 700, duration: 40 },
+            { category: 'Чоловічі послуги', title: 'Стрижка модельна чоловіча', description: 'Модельна чоловіча стрижка.', price: 850, duration: 60 },
+            { category: 'Чоловічі послуги', title: 'Стрижка бороди та вусів', description: 'Корекція бороди та вусів.', price: 500, duration: 30 },
+            { category: 'Чоловічі послуги', title: 'Чоловіча укладка', description: 'Укладка чоловічого волосся.', price: 450, duration: 30 },
+            { category: 'Чоловічі послуги', title: 'Камуфляж сивини', description: 'Тонування сивини для чоловіків.', price: 850, duration: 45 },
+            { category: 'Чоловічі послуги', title: 'Манікюр гігієнічний чоловічий', description: 'Гігієнічний манікюр для чоловіків.', price: 750, duration: 60 },
+            { category: 'Чоловічі послуги', title: 'SPA-манікюр чоловічий', description: 'SPA-догляд для рук.', price: 1100, duration: 60 },
+            { category: 'Чоловічі послуги', title: 'Педикюр апаратний чоловічий', description: 'Апаратний чоловічий педикюр.', price: 950, duration: 75 },
+            { category: 'Чоловічі послуги', title: 'SPA-педикюр чоловічий', description: 'SPA-догляд для ніг.', price: 1250, duration: 90 },
+            { category: 'Чоловічі послуги', title: 'Парафінотерапія рук', description: 'Парафінотерапія рук для чоловіків.', price: 550, duration: 30 },
+            { category: 'Чоловічі послуги', title: 'Парафінотерапія ніг', description: 'Парафінотерапія ніг для чоловіків.', price: 650, duration: 30 },
+            { category: 'Чоловічі послуги', title: 'Догляд за обличчям', description: 'Косметологічний догляд за обличчям.', price: 1500, duration: 75 },
+            { category: 'Чоловічі послуги', title: 'Видалення волосся', description: 'Видалення волосся на спині, грудях або пахвах.', price: 500, duration: 60 },
+            { category: 'Чоловічі послуги', title: 'Макіяж денний', description: 'Денний макіяж.', price: 1000, duration: 60 },
+            { category: 'Чоловічі послуги', title: 'Корекція або фарбування брів', description: 'Корекція або фарбування брів.', price: 500, duration: 30 },
+            { category: 'Чоловічі послуги', title: 'Масаж класичний', description: 'Класичний масаж.', price: 900, duration: 60 },
+            { category: 'Чоловічі послуги', title: 'Масаж спини', description: 'Класичний масаж спини.', price: 600, duration: 40 },
+            { category: 'Чоловічі послуги', title: 'Стоун-масаж', description: 'Масаж із використанням гарячого каміння.', price: 1200, duration: 75 },
+            { category: 'Чоловічі послуги', title: 'Стоун-масаж ділянки тіла', description: 'Стоун-масаж окремої ділянки тіла.', price: 600, duration: 40 },
+
+            { category: 'Послуги для дітей', title: 'Стрижка дитяча до 5 років', description: 'Дитяча стрижка для дітей до 5 років.', price: 500, duration: 40 },
+            { category: 'Послуги для дітей', title: 'Стрижка гарячими ножицями дитяча', description: 'Дитяча стрижка гарячими ножицями.', price: 700, duration: 50 },
+            { category: 'Послуги для дітей', title: 'Накрутка або афронакрутка дитяча', description: 'Дитяча накрутка або афронакрутка.', price: 550, duration: 60 },
+            { category: 'Послуги для дітей', title: 'Косички', description: 'Плетіння дитячих косичок.', price: 300, duration: 45 },
+            { category: 'Послуги для дітей', title: 'Дитяча зачіска', description: 'Святкова зачіска для дитини.', price: 700, duration: 60 },
+            { category: 'Послуги для дітей', title: 'Стрижка підліткова хлопчача', description: 'Підліткова стрижка для хлопців до 10 років.', price: 700, duration: 45 },
+            { category: 'Послуги для дітей', title: 'Стрижка підліткова дівоча', description: 'Підліткова стрижка для дівчат до 10 років.', price: 950, duration: 60 },
+            { category: 'Послуги для дітей', title: 'Проколювання вушок пістолетом', description: 'Проколювання вушок пістолетом.', price: 850, duration: 30 },
+            { category: 'Послуги для дітей', title: 'Глітер-тату малюнок', description: 'Декоративний глітер-тату малюнок.', price: 200, duration: 20 },
+            { category: 'Послуги для дітей', title: 'Макіяж дитячий', description: 'Легкий дитячий макіяж.', price: 700, duration: 40 },
+            { category: 'Послуги для дітей', title: 'Манікюр дитячий', description: 'Дитячий манікюр.', price: 400, duration: 40 },
+            { category: 'Послуги для дітей', title: 'Покриття нігтів лаком дитяче', description: 'Дитяче покриття нігтів лаком.', price: 200, duration: 25 },
+            { category: 'Послуги для дітей', title: 'Педикюр підлітковий', description: 'Підлітковий педикюр.', price: 550, duration: 50 }
+          ]
+          EOF
+
+          cat > server/api/dev/seed-services.post.ts <<'EOF'
+          import { connectToDatabase } from '../../utils/mongodb'
+          import { Service } from '../../models/Service'
+          import { seedServices } from '../../data/seedServices'
+
+          export default defineEventHandler(async () => {
+            await connectToDatabase()
+
+            const count = await Service.countDocuments()
+
+            if (count > 0) {
+              return {
+                success: false,
+                message: 'Послуги вже є в базі даних. Завантаження не виконано.',
+                count
+              }
+            }
+
+            const result = await Service.insertMany(seedServices)
+
+            return {
+              success: true,
+              message: 'Послуги успішно завантажено в базу даних.',
+              count: result.length
+            }
+          })
+          EOF
+
+          cat > pages/services.vue <<'EOF'
+          <script setup lang="ts">
+          type ServiceItem = {
+            _id: string
+            title: string
+            category?: string
+            description: string
+            price: number
+            duration: number
+          }
+
+          const { data: services, pending, error, refresh } = await useFetch<ServiceItem[]>('/api/services')
+
+          const seedMessage = ref('')
+          const seedError = ref('')
+          const seedLoading = ref(false)
+
+          const groupedServices = computed(() => {
+            const list = Array.isArray(services.value) ? services.value : []
+            const groups: Record<string, ServiceItem[]> = {}
+
+            for (const service of list) {
+              const category = service.category || 'Інші послуги'
+
+              if (!groups[category]) {
+                groups[category] = []
+              }
+
+              groups[category].push(service)
+            }
+
+            return groups
+          })
+
+          async function seedServices() {
+            seedMessage.value = ''
+            seedError.value = ''
+            seedLoading.value = true
+
+            try {
+              const response = await $fetch<{ success: boolean; message: string; count: number }>('/api/dev/seed-services', {
+                method: 'POST'
+              })
+
+              if (response.success) {
+                seedMessage.value = `${response.message} Додано: ${response.count}.`
+                await refresh()
+              } else {
+                seedError.value = `${response.message} Поточна кількість: ${response.count}.`
+              }
+            } catch (err: any) {
+              seedError.value = err?.data?.statusMessage || 'Не вдалося завантажити послуги.'
+            } finally {
+              seedLoading.value = false
+            }
+          }
+          </script>
+
+          <template>
+            <section class="mx-auto max-w-6xl px-4 py-10">
+              <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h1 class="text-3xl font-bold">Послуги</h1>
+                  <p class="mt-2 text-stone-600">
+                    Перелік послуг перукарні, згрупований за категоріями.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  :disabled="seedLoading"
+                  class="rounded-xl border border-brand-700 px-4 py-2 text-sm font-medium text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  @click="seedServices"
+                >
+                  {{ seedLoading ? 'Завантаження...' : 'Завантажити стартові послуги' }}
+                </button>
+              </div>
+
+              <div
+                v-if="seedMessage"
+                class="mb-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700"
+              >
+                {{ seedMessage }}
+              </div>
+
+              <div
+                v-if="seedError"
+                class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+              >
+                {{ seedError }}
+              </div>
+
+              <div
+                class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+              >
+                Кнопка завантаження послуг є тимчасовою. Після одноразового заповнення бази даних її можна буде прибрати.
+              </div>
+
+              <div v-if="pending" class="text-stone-500">
+                Завантаження...
+              </div>
+
+              <div v-else-if="error" class="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+                Не вдалося завантажити список послуг.
+              </div>
+
+              <div v-else class="space-y-8">
+                <section
+                  v-for="(items, category) in groupedServices"
+                  :key="category"
+                >
+                  <div class="mb-4 border-b border-stone-300 pb-2">
+                    <h2 class="text-2xl font-semibold text-stone-900">
+                      {{ category }}
+                    </h2>
+                  </div>
+
+                  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <article
+                      v-for="service in items"
+                      :key="service._id"
+                      class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
+                    >
+                      <h3 class="mb-2 text-xl font-semibold">{{ service.title }}</h3>
+                      <p class="mb-3 text-stone-600">{{ service.description }}</p>
+                      <div class="flex items-center justify-between text-sm text-stone-500">
+                        <span>{{ service.duration }} хв</span>
+                        <span class="font-medium text-stone-800">{{ service.price }} грн</span>
+                      </div>
+                    </article>
+                  </div>
+                </section>
+
+                <article
+                  v-if="Array.isArray(services) && services.length === 0"
+                  class="rounded-2xl border border-dashed border-stone-300 bg-white p-5 text-stone-500"
+                >
+                  У базі даних поки немає послуг. Натисніть кнопку “Завантажити стартові послуги”.
+                </article>
+              </div>
+            </section>
+          </template>
+          EOF
+
+      - name: Commit TASK006 changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "TASK006: add service categories and seed services"
+          git push
